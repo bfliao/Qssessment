@@ -346,13 +346,30 @@ export default function PipelineApp({
   }
 
   const selected = incidents.find((i) => i.id === selectedId);
+  const managerSignals =
+    scenario?.derivedFrom.teamInput
+      ?.map((member) => member.description.trim())
+      .filter(Boolean)
+      .slice(0, 2) ?? [];
+  const managerFocus =
+    scenario?.focusAreas?.slice(0, 4) ??
+    skillset
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 4);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ---- Left: context + incident selection ---- */}
       <section className="space-y-4 rounded-xl border border-slate-800 bg-surface p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">Job context</h2>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Step 1
+            </p>
+            <h2 className="text-lg font-medium">Assessment inputs</h2>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -361,7 +378,7 @@ export default function PipelineApp({
               }}
               className="btn-ghost"
             >
-              <Pencil className="h-3.5 w-3.5" /> Edit JD
+              <Pencil className="h-3.5 w-3.5" /> Edit job
             </button>
             {!useMock && (
               <button
@@ -369,7 +386,7 @@ export default function PipelineApp({
                 disabled={crawling}
                 className="btn-ghost"
               >
-                <RefreshCw className={`h-3.5 w-3.5${crawling ? " animate-spin" : ""}`} /> Re-crawl
+                <RefreshCw className={`h-3.5 w-3.5${crawling ? " animate-spin" : ""}`} /> Refresh evidence
               </button>
             )}
           </div>
@@ -441,7 +458,7 @@ export default function PipelineApp({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-300">
-                Real incidents (crawled)
+                Evidence from crawl
               </span>
               {crawling && (
                 <span className="flex items-center gap-1 text-xs text-slate-500">
@@ -603,7 +620,7 @@ export default function PipelineApp({
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Generate scenario
+          Generate assessment scenario
         </button>
       </section>
 
@@ -624,10 +641,10 @@ export default function PipelineApp({
               >
                 {t === "rubric" ? (
                   <span className="flex items-center gap-1.5">
-                    Rubric
+                    Evaluation rubric
                     {loading === "critique" && <Loader2 className="h-3 w-3 animate-spin" />}
                   </span>
-                ) : "Scenario"}
+                ) : "Review scenario"}
               </button>
             ))}
           </div>
@@ -649,7 +666,7 @@ export default function PipelineApp({
                   }
                   className="btn-ghost"
                 >
-                  <BookmarkPlus className="h-4 w-4" /> Save
+                  <BookmarkPlus className="h-4 w-4" /> Save to library
                 </button>
               )}
               <button
@@ -662,7 +679,7 @@ export default function PipelineApp({
                 ) : (
                   <Link2 className="h-4 w-4" />
                 )}
-                Share
+                Generate candidate link
               </button>
               <button
                 onClick={() => { runCritique(); setOutputTab("rubric"); }}
@@ -674,7 +691,7 @@ export default function PipelineApp({
                 ) : (
                   <Sparkles className="h-4 w-4" />
                 )}
-                Run critique
+                Generate rubric
               </button>
             </div>
           )}
@@ -717,6 +734,62 @@ export default function PipelineApp({
           {outputTab === "scenario" ? (
             scenario ? (
               <div className="space-y-4">
+                <div className="rounded-lg border border-slate-800 bg-background p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Candidate brief
+                    </h3>
+                    <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-500">
+                      Candidate-facing
+                    </span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+                    {scenario.brief}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-slate-800 bg-background p-4">
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Manager persona
+                    </h3>
+                    <p className="text-sm font-medium text-slate-200">
+                      Sam · Engineering Manager
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                      Helpful and busy. Answers the question the candidate actually asks,
+                      grounded in this scenario&apos;s evidence and team expectations.
+                    </p>
+                    {managerSignals.length > 0 && (
+                      <ul className="mt-3 space-y-1.5">
+                        {managerSignals.map((signal, i) => (
+                          <li key={i} className="text-xs leading-relaxed text-slate-500">
+                            “{signal}”
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-slate-800 bg-background p-4">
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      What this assesses
+                    </h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full border border-slate-600 bg-surface px-2 py-0.5 text-xs font-medium capitalize text-slate-300">
+                        {scenario.difficulty}
+                      </span>
+                      {managerFocus.map((f) => (
+                        <Tag key={f}>{f}</Tag>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                      The candidate should reduce ambiguity through focused questions,
+                      then decide the next immediate step.
+                    </p>
+                  </div>
+                </div>
+
                 {scenario.groundedOn && (
                   <a
                     href={scenario.groundedOn.source || undefined}
@@ -728,9 +801,6 @@ export default function PipelineApp({
                     Grounded on: {scenario.groundedOn.title}
                   </a>
                 )}
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
-                  {scenario.brief}
-                </p>
 
                 {/* Candidate instructions */}
                 {(scenario.todos?.length > 0 || scenario.scope?.focus?.length > 0) && (
@@ -818,8 +888,31 @@ export default function PipelineApp({
                 )}
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                Pick an incident and generate a scenario to begin.
+              <div className="flex h-full items-center justify-center">
+                {loading === "scenario" ? (
+                  <div className="w-full max-w-sm space-y-3 rounded-xl border border-slate-800 bg-background p-5">
+                    <p className="text-sm font-medium text-slate-200">
+                      Building candidate assessment…
+                    </p>
+                    {[
+                      "Using crawled evidence",
+                      "Drafting workplace scenario",
+                      "Shaping Sam's manager persona",
+                      "Preparing candidate-ready brief",
+                    ].map((label, i) => (
+                      <div key={label} className="flex items-center gap-3 text-xs text-slate-400">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 text-[10px] text-slate-500">
+                          {i + 1}
+                        </span>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-slate-500">
+                    Select evidence, then generate an assessment scenario.
+                  </div>
+                )}
               </div>
             )
           ) : (

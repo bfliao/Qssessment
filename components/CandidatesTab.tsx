@@ -177,7 +177,7 @@ export default function CandidatesTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-400">
-          Manage candidates and generate assessment links.
+          Assign generated assessments and copy candidate-ready links.
         </p>
         <button onClick={() => { setEditing(null); setShowForm(true); }} className="btn-primary">
           <Plus className="h-4 w-4" /> Add candidate
@@ -543,6 +543,14 @@ function ApplicationRow({
             >
               Copy
             </button>
+            <a
+              href={lastAssessmentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-ghost shrink-0"
+            >
+              Open
+            </a>
           </div>
         </div>
       )}
@@ -591,7 +599,7 @@ function SendAssessmentPanel({
       </div>
 
       {allScenarios.length === 0 ? (
-        <p className="text-xs text-slate-500">No saved scenarios. Generate some in the Playground first.</p>
+        <p className="text-xs text-slate-500">No saved scenarios. Generate one in Build Assessment first.</p>
       ) : (
         <div className="space-y-1 max-h-48 overflow-y-auto">
           {allScenarios.map((s) => (

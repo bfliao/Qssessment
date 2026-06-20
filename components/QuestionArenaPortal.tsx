@@ -14,6 +14,7 @@ import {
   generateManagerAnswer,
   scoreInformationGain,
 } from "@/lib/questionArena/answerer";
+import { ConceptCoverageGraph } from "@/components/ConceptCoverageGraph";
 import type {
   GatekeeperDecision,
   Message,
@@ -1792,7 +1793,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                 )}
 
                 {interviewPhase === "submitted" && (
-                  <div className="grid min-h-[60vh] place-items-center">
+                  <div className="space-y-5">
                     <div className="w-full rounded-[28px] border border-white/75 bg-white/55 p-9 text-center shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
                       <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-white/75 bg-white/70 shadow-[0_10px_30px_rgba(38,38,54,.10)]">
                         <CheckCircle2 className="h-8 w-8 text-[#3a8f63]" />
@@ -1826,6 +1827,98 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                         </div>
                       </div>
                     </div>
+
+                    {report && (
+                      <div className="rounded-[28px] border border-white/75 bg-white/60 p-6 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
+                        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+                              Evaluation report
+                            </p>
+                            <h2 className="mt-1 text-[24px] font-extrabold tracking-[-0.035em] text-[#17171c]">
+                              {report.assessment.label}
+                            </h2>
+                          </div>
+                          <div className="rounded-full bg-[#17171c] px-4 py-2 text-sm font-black text-white">
+                            {report.deterministic.percent}%
+                          </div>
+                        </div>
+
+                        <p className="rounded-[18px] border border-black/10 bg-white/45 p-4 text-left text-[14px] font-medium leading-6 text-[#3a3a42]">
+                          {report.assessment.summary}
+                        </p>
+
+                        <ConceptCoverageGraph
+                          scenario={scenario}
+                          unlockedFactIds={unlockedFactIds}
+                          messages={messages}
+                          candidateName="Candidate"
+                          compact
+                          className="mt-5 text-left"
+                        />
+
+                        {report.assessment.signalBreakdown && (
+                          <div className="mt-5 grid gap-3">
+                            {[
+                              [
+                                "Question quality",
+                                report.assessment.signalBreakdown.questionQuality,
+                              ],
+                              [
+                                "Adaptive follow-up",
+                                report.assessment.signalBreakdown.adaptiveFollowUp,
+                              ],
+                              [
+                                "Ownership posture",
+                                report.assessment.signalBreakdown.ownershipPosture,
+                              ],
+                              [
+                                "Grounded next step",
+                                report.assessment.signalBreakdown.groundedNextStep,
+                              ],
+                            ].map(([title, signal]) => (
+                              <div
+                                key={title as string}
+                                className="rounded-[16px] border border-black/10 bg-white/45 p-4 text-left"
+                              >
+                                <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
+                                  {title as string}
+                                </p>
+                                <p className="mt-1 text-sm font-black text-[#17171c]">
+                                  {(signal as { label: string }).label}
+                                </p>
+                                <p className="mt-1 text-[13px] font-medium leading-6 text-[#5a5470]">
+                                  {(signal as { assessment: string }).assessment}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-[16px] border border-black/10 bg-white/45 p-4 text-left">
+                            <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
+                              Strengths
+                            </p>
+                            <ul className="mt-2 space-y-2 text-[13px] font-medium leading-5 text-[#3a3a42]">
+                              {report.assessment.strengths.slice(0, 3).map((item, index) => (
+                                <li key={`strength-${index}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="rounded-[16px] border border-black/10 bg-white/45 p-4 text-left">
+                            <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
+                              Watch-outs
+                            </p>
+                            <ul className="mt-2 space-y-2 text-[13px] font-medium leading-5 text-[#3a3a42]">
+                              {report.assessment.concerns.slice(0, 3).map((item, index) => (
+                                <li key={`concern-${index}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

@@ -16,8 +16,8 @@ export default function ScenariosTab({
   if (saved.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-800 p-12 text-center text-sm text-slate-500">
-        No saved scenarios yet. Generate one in the Playground and click&nbsp;
-        <span className="text-slate-400">Save</span>.
+        No saved scenarios yet. Generate one in Build Assessment and click&nbsp;
+        <span className="text-slate-400">Save to library</span>.
       </div>
     );
   }
@@ -158,7 +158,7 @@ function ScenarioRow({
           {/* Scenario brief */}
           <div>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Scenario
+              Candidate brief
             </h3>
             <p className="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">
               {saved.scenario.brief}

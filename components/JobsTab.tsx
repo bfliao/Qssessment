@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2, X, Play } from "lucide-react";
 import type { SavedJob } from "@/scenario_generation/types";
 
@@ -17,15 +17,31 @@ export default function JobsTab({
 }) {
   const [showForm, setShowForm] = useState(false);
 
+  useEffect(() => {
+    if (jobs.length === 0) setShowForm(true);
+  }, [jobs.length]);
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">
-          Save tailored job descriptions to reuse in the Playground.
+      <div className="rounded-xl border border-slate-800 bg-surface p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Step 1
         </p>
+        <div className="mt-1 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-100">
+              Create a job
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+              Start with the role, JD, and team expectations. This becomes the
+              source context for crawling evidence and generating the candidate
+              assessment.
+            </p>
+          </div>
         <button onClick={() => setShowForm(true)} className="btn-primary">
           <Plus className="h-4 w-4" /> Add job
         </button>
+        </div>
       </div>
 
       {showForm && (
@@ -45,6 +61,11 @@ export default function JobsTab({
         </div>
       ) : (
         <div className="space-y-2">
+          {jobs.length > 0 && (
+            <p className="text-sm text-slate-400">
+              Choose a job to continue to scenario generation.
+            </p>
+          )}
           {jobs.map((j) => (
             <JobRow key={j.id} job={j} onDelete={onDelete} onUse={onUse} />
           ))}
@@ -196,7 +217,7 @@ function JobRow({
             }}
             className="flex items-center gap-1 text-xs text-accent hover:text-accent/80"
           >
-            <Play className="h-3 w-3" /> Use
+            <Play className="h-3 w-3" /> Build assessment
           </button>
           <button
             onClick={(e) => {
