@@ -11,6 +11,7 @@ import {
   gatekeepQuestion,
   generateManagerAnswer,
 } from "@/lib/questionArena/answerer";
+import { ConceptCoverageGraph } from "@/components/ConceptCoverageGraph";
 import type {
   GatekeeperDecision,
   Message,
@@ -74,6 +75,8 @@ interface StoredRawSavedScenario {
     };
   };
 }
+
+type InterviewPhase = "task_drop" | "workspace" | "next_step" | "submitted";
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -264,6 +267,10 @@ function scenarioConfigFromAssessment(
   };
 }
 
+function managerOpeningMessage(scenario: ScenarioConfig) {
+  return `I'm here. Ask me what you need to know before deciding your next step.`;
+}
+
 export default function QuestionArenaPortal({
   scenarios,
   defaultProcessorPrompt,
@@ -305,14 +312,20 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     "Model endpoint not tested in UI."
   );
   const [devMode, setDevMode] = useState(initialDevMode);
+  const [interviewPhase, setInterviewPhase] =
+    useState<InterviewPhase>("task_drop");
   const [voiceMode, setVoiceMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const loadedAssessmentRef = useRef<string | null>(null);
+  const questionInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const audioRef = useRef<AudioBufferSourceNode | null>(null);
 
-  const questionsLeft = Math.max(scenario.maxQuestions - messages.length / 2, 0);
+  const candidateQuestionCount = messages.filter(
+    (message) => message.role === "candidate"
+  ).length;
+  const questionsLeft = Math.max(scenario.maxQuestions - candidateQuestionCount, 0);
   const unlockedFacts = useMemo(
     () =>
       scenario.hiddenFacts.filter((fact) => unlockedFactIds.includes(fact.id)),
@@ -351,6 +364,10 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     ? "grid items-start grid-cols-[minmax(360px,0.9fr)_minmax(440px,1.2fr)_minmax(260px,0.7fr)] gap-4 max-[1180px]:grid-cols-1"
     : "mx-auto grid w-full max-w-7xl grid-cols-1 items-start";
   const assessmentUnavailable = Boolean(assessmentLoadError);
+  const showTaskDrop =
+    !devMode && interviewPhase === "task_drop" && !assessmentUnavailable;
+  const canAskQuestions =
+    interviewPhase === "workspace" && !assessmentUnavailable && questionsLeft > 0;
 
   function resetRun(nextScenario = scenario) {
     setMessages([]);
@@ -359,8 +376,31 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     setUnlockedFactIds([]);
     setLastDecision(null);
     setReport(null);
+    setInterviewPhase("task_drop");
+    setTranscript("");
+    setVoiceMode(false);
     setStatus(`Run reset for ${nextScenario.title}.`);
   }
+
+  function enterWorkspace() {
+    setMessages((current) =>
+      current.length
+        ? current
+        : [{ role: "manager", content: managerOpeningMessage(scenario) }]
+    );
+    setInterviewPhase("workspace");
+    setStatus(`Workspace opened for ${scenario.title}.`);
+  }
+
+  function moveToNextStep() {
+    setInterviewPhase("next_step");
+    setStatus("Ready for next immediate step.");
+  }
+
+  useEffect(() => {
+    if (interviewPhase !== "workspace" || voiceMode) return;
+    questionInputRef.current?.focus();
+  }, [interviewPhase, voiceMode]);
 
   function loadTemplate(id: string) {
     const next = scenarios.find((item) => item.id === id) ?? scenarios[0];
@@ -517,7 +557,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
   async function askManager(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = question.trim();
-    if (!text || questionsLeft <= 0 || loadingAnswer) return;
+    if (!text || !canAskQuestions || loadingAnswer) return;
 
     setQuestion("");
     setLoadingAnswer(true);
@@ -570,6 +610,9 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
       setUnlockedFactIds(nextUnlocked);
       setLastDecision(decision);
       setReport(null);
+      if (questionsLeft <= 1) {
+        setInterviewPhase("next_step");
+      }
       void speakManagerAnswer(answer);
     } catch (error) {
       setQuestion(text);
@@ -580,6 +623,15 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
   }
 
   async function generateReport() {
+    const nextStep = finalRecommendation.trim();
+    if (!nextStep) {
+      setStatus("Write your next immediate step before submitting.");
+      return;
+    }
+    if (assessmentUnavailable) {
+      setStatus("Assessment link unavailable.");
+      return;
+    }
     setLoadingEvaluation(true);
     try {
       const res = await fetch("/api/question-arena/evaluate", {
@@ -589,7 +641,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
           scenario,
           messages,
           unlockedFactIds,
-          finalRecommendation,
+          finalRecommendation: nextStep,
           evaluatorPrompt,
         }),
       });
@@ -601,6 +653,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
           ? data.warning
           : `Validator report generated with ${data.modelUsed} (${data.source}).`
       );
+      setInterviewPhase("submitted");
     } catch (error) {
       setStatus(
         error instanceof Error ? error.message : "Validator report failed."
@@ -667,6 +720,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
   }
 
   function startRecording() {
+    if (!canAskQuestions || loadingAnswer) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Win = window as any;
     const SR = Win.SpeechRecognition ?? Win.webkitSpeechRecognition;
@@ -701,7 +755,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     recognition.onend = () => {
       setIsRecording(false);
       const text = finalText.trim();
-      if (text) {
+      if (text && canAskQuestions) {
         setTranscript("");
         void (async () => {
           const q = text;
@@ -731,6 +785,9 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
             setUnlockedFactIds(nextUnlocked);
             setLastDecision(decision);
             setReport(null);
+            if (questionsLeft <= 1) {
+              setInterviewPhase("next_step");
+            }
             void speakManagerAnswer(answer);
           } catch (error) {
             setQuestion(q);
@@ -960,7 +1017,38 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
       </section>
         )}
 
-      <section className="grid min-h-[calc(100vh-2rem)] overflow-hidden rounded-lg border border-slate-800 bg-surface shadow-2xl shadow-slate-950/40 lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+      <section className="relative grid min-h-[calc(100vh-2rem)] overflow-hidden rounded-lg border border-slate-800 bg-surface shadow-2xl shadow-slate-950/40 lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+        {showTaskDrop && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/85 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-xl border border-slate-700 bg-surface p-6 shadow-2xl shadow-slate-950">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                New workplace task
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-50">
+                {scenario.title}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                From: {scenario.persona.name}, {scenario.persona.role}
+              </p>
+              <div className="mt-5 rounded-lg border border-slate-800 bg-background p-4">
+                <p className="text-base leading-7 text-slate-100">
+                  {scenario.candidatePrompt}
+                </p>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-slate-400">
+                Read the brief, then enter the workspace to ask your manager what
+                you need to know before choosing your next immediate step.
+              </p>
+              <button
+                type="button"
+                onClick={enterWorkspace}
+                className="mt-5 w-full rounded-md bg-emerald-300 px-4 py-3 text-sm font-bold text-slate-950 transition-opacity hover:opacity-90"
+              >
+                Enter workspace
+              </button>
+            </div>
+          </div>
+        )}
         <aside className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col border-b border-slate-800 bg-slate-950/50 lg:border-b-0 lg:border-r">
           <div className="border-b border-slate-800 px-5 py-5 text-center">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
@@ -1043,7 +1131,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
               </h3>
             </div>
             <div className="text-xs font-semibold text-slate-500">
-              {messages.length / 2} asked
+              {candidateQuestionCount} asked
             </div>
           </header>
 
@@ -1104,6 +1192,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
             </div>
           </div>
 
+        {interviewPhase === "workspace" && (
         <div className="border-t border-slate-800 bg-background px-4 pt-3 pb-0">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -1111,6 +1200,14 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                 Ask me a question
               </label>
             </div>
+            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={moveToNextStep}
+              className="rounded-md border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300 transition-colors hover:border-emerald-300/60 hover:text-emerald-200"
+            >
+              Ready to state next step
+            </button>
             <div className="flex items-center gap-1 rounded-full border border-slate-700 p-0.5">
               <button
                 type="button"
@@ -1137,27 +1234,30 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                 Voice
               </button>
             </div>
+            </div>
           </div>
         </div>
+        )}
 
-        {!voiceMode ? (
+        {interviewPhase === "workspace" && !voiceMode ? (
           <form
             onSubmit={askManager}
             className="border-t border-slate-800 bg-background p-4 pt-2"
           >
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <input
+                ref={questionInputRef}
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 disabled={
-                  assessmentUnavailable || questionsLeft <= 0 || loadingAnswer
+                  !canAskQuestions || loadingAnswer
                 }
                 placeholder="Example: who is affected, and what outcome matters most?"
                 className="rounded-md border border-slate-700 bg-surface px-3 py-3 text-sm outline-none focus:border-emerald-300 disabled:opacity-50"
               />
               <button
                 disabled={
-                  assessmentUnavailable || questionsLeft <= 0 || loadingAnswer
+                  !canAskQuestions || loadingAnswer
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-300 px-4 py-3 text-sm font-bold text-slate-950 disabled:opacity-50"
               >
@@ -1166,7 +1266,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
               </button>
             </div>
           </form>
-        ) : (
+        ) : interviewPhase === "workspace" ? (
           <div className="border-t border-slate-800 bg-background p-4 pt-2">
             <div className="flex flex-col items-center gap-3">
               {transcript && (
@@ -1179,7 +1279,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                   type="button"
                   onClick={startRecording}
                   disabled={
-                    assessmentUnavailable || questionsLeft <= 0 || loadingAnswer
+                    !canAskQuestions || loadingAnswer
                   }
                   className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-300 text-slate-950 shadow-lg transition-transform hover:scale-105 disabled:opacity-50"
                   title="Start recording"
@@ -1210,13 +1310,16 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
               </p>
             </div>
           </div>
-        )}
+        ) : null}
 
+        {(interviewPhase === "next_step" || interviewPhase === "submitted") && (
         <div className="border-t border-slate-800 bg-slate-950/60 p-4">
           <div className="mb-2 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-300" />
             <label className="text-sm font-semibold text-slate-200">
-              Submit your next immediate step
+              {interviewPhase === "submitted"
+                ? "Next immediate step submitted"
+                : "Submit your next immediate step"}
             </label>
           </div>
           <p className="mb-3 text-xs leading-relaxed text-slate-500">
@@ -1225,23 +1328,54 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
           <textarea
             value={finalRecommendation}
             onChange={(event) => setFinalRecommendation(event.target.value)}
+            disabled={interviewPhase === "submitted" || assessmentUnavailable}
             className="h-24 w-full resize-y rounded-md border border-slate-700 bg-surface p-3 text-sm leading-relaxed outline-none focus:border-emerald-300"
             placeholder="My next step would be..."
           />
-          <button
-            onClick={generateReport}
-            disabled={loadingEvaluation}
-            className="mt-3 w-full rounded-md bg-emerald-300 px-4 py-3 text-sm font-bold text-slate-950 disabled:opacity-50"
-          >
-            {loadingEvaluation ? "Submitting..." : "Submit assessment"}
-          </button>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[auto_1fr]">
+            {interviewPhase !== "submitted" && questionsLeft > 0 && (
+              <button
+                type="button"
+                onClick={() => setInterviewPhase("workspace")}
+                className="rounded-md border border-slate-700 px-4 py-3 text-sm font-bold text-slate-300"
+              >
+                Ask another question
+              </button>
+            )}
+            <button
+              onClick={generateReport}
+              disabled={
+                loadingEvaluation ||
+                interviewPhase === "submitted" ||
+                assessmentUnavailable ||
+                !finalRecommendation.trim()
+              }
+              className="rounded-md bg-emerald-300 px-4 py-3 text-sm font-bold text-slate-950 disabled:opacity-50"
+            >
+              {interviewPhase === "submitted"
+                ? "Submitted"
+                : loadingEvaluation
+                ? "Submitting..."
+                : "Submit next step"}
+            </button>
+          </div>
         </div>
+        )}
 
         {report && (
           <div className="border-t border-slate-800 bg-slate-950 p-4">
             <h3 className="mb-2 text-sm font-bold text-slate-300">
               Evaluation Report
             </h3>
+            {!devMode && (
+              <ConceptCoverageGraph
+                scenario={scenario}
+                unlockedFactIds={unlockedFactIds}
+                messages={messages}
+                candidateName="Candidate"
+                className="mb-5"
+              />
+            )}
             <div className="mb-3 inline-flex rounded-full bg-emerald-300 px-3 py-1 text-sm font-black text-slate-950">
               {report.deterministic.percent}% · {report.assessment.label}
             </div>
@@ -1352,6 +1486,15 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
           Debug
         </p>
         <h2 className="mb-5 text-xl font-semibold">Answerer State</h2>
+
+        <ConceptCoverageGraph
+          scenario={scenario}
+          unlockedFactIds={unlockedFactIds}
+          messages={messages}
+          candidateName="Current run"
+          compact
+          className="mb-6"
+        />
 
         <section className="mb-6">
           <h3 className="mb-2 text-sm font-bold text-slate-300">
