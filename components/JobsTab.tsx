@@ -23,25 +23,10 @@ export default function JobsTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-800 bg-surface p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Step 1
-        </p>
-        <div className="mt-1 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-100">
-              Create a job
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-              Start with the role, JD, and team expectations. This becomes the
-              source context for crawling evidence and generating the candidate
-              assessment.
-            </p>
-          </div>
+      <div className="flex justify-end">
         <button onClick={() => setShowForm(true)} className="btn-primary">
           <Plus className="h-4 w-4" /> Add job
         </button>
-        </div>
       </div>
 
       {showForm && (
@@ -159,7 +144,7 @@ function JobForm({
           disabled={!title.trim() || !jd.trim()}
           className="btn-primary"
         >
-          Save job
+          Save and build assessment
         </button>
       </div>
     </div>

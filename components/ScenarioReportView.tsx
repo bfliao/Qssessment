@@ -1,57 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type {
+  ScenarioReportCluster,
+  ScenarioReportData,
+  ScenarioReportFact,
+  ScenarioReportRun,
+} from "@/lib/managerReport/types";
 
-type NodeCluster = "discovery" | "validation" | "mitigation" | "communication" | "prevention";
-
-export interface ScenarioReportFact {
-  id: string;
-  title: string;
-  fact: string;
-  group: "Discovery" | "Validation" | "Mitigation" | "Communication" | "Prevention";
-}
-
-export interface ScenarioReportRun {
-  id: string;
-  candidateName: string;
-  profile: string;
-  label: string;
-  percent: number;
-  unlockedFactIds: string[];
-  summary: string;
-  finalRecommendation: string;
-  messages: Array<{ role: "candidate" | "manager"; content: string }>;
-}
-
-export interface ScenarioReportData {
-  scenario: {
-    id: string;
-    title: string;
-    displayTitle: string;
-    role: string;
-    source?: string;
-    prompt: string;
-  };
-  facts: ScenarioReportFact[];
-  graph: {
-    nodes: GraphNode[];
-    links: Array<[string, string]>;
-  };
-  runs: ScenarioReportRun[];
-}
-
-interface GraphNode {
-  id: string;
-  label: string;
-  group: ScenarioReportFact["group"];
-  cluster: NodeCluster;
-  x: number;
-  y: number;
-  root?: boolean;
-  trap?: boolean;
-}
-
-const CLUSTER_LABELS: Record<NodeCluster, string> = {
+const CLUSTER_LABELS: Record<ScenarioReportCluster, string> = {
   discovery: "discovery",
   validation: "root cause",
   mitigation: "mitigation",
@@ -59,7 +16,7 @@ const CLUSTER_LABELS: Record<NodeCluster, string> = {
   prevention: "prevention",
 };
 
-const CLUSTER_COLORS: Record<NodeCluster, string> = {
+const CLUSTER_COLORS: Record<ScenarioReportCluster, string> = {
   discovery: "#1fa896",
   validation: "#5a8fcf",
   mitigation: "#7aab57",
@@ -67,7 +24,7 @@ const CLUSTER_COLORS: Record<NodeCluster, string> = {
   prevention: "#c9743a",
 };
 
-const CLUSTER_POSITIONS: Record<NodeCluster, [number, number]> = {
+const CLUSTER_POSITIONS: Record<ScenarioReportCluster, [number, number]> = {
   discovery: [185, 84],
   validation: [465, 82],
   mitigation: [200, 278],
@@ -89,7 +46,13 @@ function candidateQuestions(run: ScenarioReportRun) {
   return run.messages.filter((message) => message.role === "candidate");
 }
 
-export function ScenarioReportView({ data }: { data: ScenarioReportData }) {
+export function ScenarioReportView({
+  data,
+  embedded = false,
+}: {
+  data: ScenarioReportData;
+  embedded?: boolean;
+}) {
   const [selectedId, setSelectedId] = useState("overview");
   const isOverview = selectedId === "overview";
   const selectedRun = data.runs.find((run) => run.id === selectedId);
@@ -116,7 +79,7 @@ export function ScenarioReportView({ data }: { data: ScenarioReportData }) {
   );
 
   return (
-    <main className="bc-page">
+    <main className={`bc-page ${embedded ? "embedded" : ""}`}>
       <style jsx global>{`
         .bc-page {
           min-height: 100vh;
@@ -125,6 +88,11 @@ export function ScenarioReportView({ data }: { data: ScenarioReportData }) {
           font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           padding: 26px 18px;
           -webkit-font-smoothing: antialiased;
+        }
+        .bc-page.embedded {
+          min-height: auto;
+          background: transparent;
+          padding: 0;
         }
         .bc-shell {
           position: relative;
@@ -360,9 +328,6 @@ export function ScenarioReportView({ data }: { data: ScenarioReportData }) {
           <section>
             <div className="bc-eyebrow">Scenario report</div>
             <h1 className="bc-title">{data.scenario.displayTitle}</h1>
-            <p className="bc-sub">
-              Lit = explored · ring = root cause · amber = trap.
-            </p>
 
             <div className="bc-switch">
               <button
@@ -394,7 +359,7 @@ export function ScenarioReportView({ data }: { data: ScenarioReportData }) {
               >
                 <g>
                   {Object.entries(CLUSTER_LABELS).map(([cluster, label]) => {
-                    const [x, y] = CLUSTER_POSITIONS[cluster as NodeCluster];
+                    const [x, y] = CLUSTER_POSITIONS[cluster as ScenarioReportCluster];
                     return (
                       <text
                         key={cluster}
@@ -551,7 +516,6 @@ export function ScenarioReportView({ data }: { data: ScenarioReportData }) {
                     );
                   })}
                 </div>
-                <p>Next step: {selectedRun?.finalRecommendation}</p>
               </div>
             )}
 

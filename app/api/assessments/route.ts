@@ -37,11 +37,19 @@ export async function POST(req: NextRequest) {
     id: payload.id,
     candidateName: payload.candidateName,
     candidateEmail: payload.candidateEmail,
+    jobId: payload.jobId,
     jobTitle: payload.jobTitle,
     targetRole: payload.targetRole,
     markdown: payload.markdown,
     createdAt: payload.createdAt || new Date().toISOString(),
+    status: payload.status || "sent",
+    submittedAt: payload.submittedAt,
+    reportGeneratedAt: payload.reportGeneratedAt,
+    finalRecommendation: payload.finalRecommendation,
+    managerReport: payload.managerReport,
+    validatorReport: payload.validatorReport,
     scenarios: payload.scenarios,
+    assessmentScenarios: payload.assessmentScenarios,
   };
 
   saveAssessment(assessment);

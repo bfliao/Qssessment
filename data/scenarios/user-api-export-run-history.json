@@ -1,0 +1,124 @@
+{
+  "scenarioId": "user_api_export_connection_leak",
+  "runs": [
+    {
+      "id": "avery-strong-incident-owner",
+      "candidateName": "Avery Chen",
+      "submittedLabel": "Previous run 01",
+      "unlockedFactIds": [
+        "connection_leak_accumulates",
+        "timeline_points_to_export",
+        "missing_release_on_error_path",
+        "memory_growth_supports_leak",
+        "disable_export_first",
+        "prevention_error_path_tests"
+      ],
+      "messages": [
+        {
+          "role": "candidate",
+          "content": "What changed today, and does the error timeline line up with the CSV export deploy?"
+        },
+        {
+          "role": "candidate",
+          "content": "How can a low-volume export endpoint still drive the MySQL pool to 98 out of 100 connections? Are connections accumulating instead of being released?"
+        },
+        {
+          "role": "candidate",
+          "content": "In the export handler code, is connection release guaranteed in a finally block on success, errors, and early returns?"
+        },
+        {
+          "role": "candidate",
+          "content": "To stop the bleeding right now, can we disable or block /export and recycle affected instances while the fix is prepared?"
+        },
+        {
+          "role": "candidate",
+          "content": "After it is stable, should we add error-path tests, a shared connection helper, and pool usage alerts so this cleanup bug is caught before shipping?"
+        }
+      ],
+      "finalRecommendation": "Disable /export with a feature flag or route block, recycle affected instances if needed, then patch the handler so release happens in finally. Add success and error-path tests plus pool usage alerts before re-enabling export.",
+      "summary": "Strong run. The candidate connected the low-volume endpoint to accumulating leaked connections, separated mitigation from the code fix, and named prevention work."
+    },
+    {
+      "id": "mina-root-cause-heavy",
+      "candidateName": "Mina Patel",
+      "submittedLabel": "Previous run 02",
+      "unlockedFactIds": [
+        "connection_leak_accumulates",
+        "timeline_points_to_export",
+        "missing_release_on_error_path",
+        "memory_growth_supports_leak"
+      ],
+      "messages": [
+        {
+          "role": "candidate",
+          "content": "What changed today, and when did the connection errors start?"
+        },
+        {
+          "role": "candidate",
+          "content": "Could the low request volume still matter if each export request opens a connection and does not close it?"
+        },
+        {
+          "role": "candidate",
+          "content": "Can I inspect the handler for early returns, catch blocks, or missing finally cleanup around connection.release?"
+        },
+        {
+          "role": "candidate",
+          "content": "Does memory growing while CPU is normal support a leak rather than generic CPU saturation?"
+        }
+      ],
+      "finalRecommendation": "Patch the export handler by ensuring connection.release runs in finally and add tests around the error path.",
+      "summary": "Developing run. The candidate found the likely leak but underplayed immediate production mitigation before the code fix."
+    },
+    {
+      "id": "priya-mitigation-first",
+      "candidateName": "Priya Rao",
+      "submittedLabel": "Previous run 03",
+      "unlockedFactIds": [
+        "connection_leak_accumulates",
+        "disable_export_first",
+        "prevention_error_path_tests"
+      ],
+      "messages": [
+        {
+          "role": "candidate",
+          "content": "Can a few export requests leak connections over time if each one opens a DB connection and fails to release it?"
+        },
+        {
+          "role": "candidate",
+          "content": "What options do we have to stop bleeding immediately - feature flag, route block, rollback, or restart?"
+        },
+        {
+          "role": "candidate",
+          "content": "After the incident, would error-path tests and alerts on pool usage catch this before release?"
+        }
+      ],
+      "finalRecommendation": "Block /export first and restart instances to recover capacity, then add tests and alerts around connection cleanup.",
+      "summary": "Developing run. The candidate had good production instincts but did not fully confirm the exact missing release or timeline evidence."
+    },
+    {
+      "id": "noah-generic-performance",
+      "candidateName": "Noah Kim",
+      "submittedLabel": "Previous run 04",
+      "unlockedFactIds": [
+        "timeline_points_to_export",
+        "memory_growth_supports_leak"
+      ],
+      "messages": [
+        {
+          "role": "candidate",
+          "content": "Did anything deploy this morning near when the latency started rising?"
+        },
+        {
+          "role": "candidate",
+          "content": "Is memory or CPU also increasing?"
+        },
+        {
+          "role": "candidate",
+          "content": "Should we increase database capacity or optimize the CSV generation?"
+        }
+      ],
+      "finalRecommendation": "Increase database max connections, profile CSV generation, and add more capacity while investigating.",
+      "summary": "Weak run. The candidate noticed timing and memory clues but moved into capacity and CSV optimization rather than connection lifecycle."
+    }
+  ]
+}

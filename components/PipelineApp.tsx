@@ -15,8 +15,6 @@ import {
   BookmarkPlus,
   ChevronDown,
   ChevronRight,
-  Link2,
-  Check,
 } from "lucide-react";
 import type {
   Criterion,
@@ -73,12 +71,8 @@ export default function PipelineApp({
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [teamOpen, setTeamOpen] = useState(false);
   const [outputTab, setOutputTab] = useState<"scenario" | "rubric">("scenario");
+  const [activeJobId, setActiveJobId] = useState<string>("");
   const [activeJobTitle, setActiveJobTitle] = useState<string>("");
-
-  // Share state
-  const [sharing, setSharing] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Generation options
   const [difficulty, setDifficulty] = useState<Difficulty>("mid");
@@ -99,6 +93,7 @@ export default function PipelineApp({
     setJd(initialJob.jd);
     setJdDraft(initialJob.jd);
     if (initialJob.skills) setSkillset(initialJob.skills);
+    setActiveJobId(initialJob.id);
     setActiveJobTitle(initialJob.title);
     setScenarios([]);
     setSelectedScenarioIdx(0);
@@ -106,7 +101,7 @@ export default function PipelineApp({
     setIncidents([]);
     setPlan(null);
     setGateDone(true);
-    if (!useMock) runCrawl(initialJob.jd);
+    if (!useMock) runCrawl(initialJob.jd, { skills: initialJob.skills || "" });
   }, [initialJob]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function buildInput() {
@@ -120,16 +115,31 @@ export default function PipelineApp({
     };
   }
 
-  async function runCrawl(jdValue: string) {
+  async function runCrawl(
+    jdValue: string,
+    options?: {
+      skills?: string;
+      exclude?: string;
+      difficulty?: Difficulty;
+    }
+  ) {
     setCrawling(true);
     setCrawlError(null);
     setIncidents([]);
     setPlan(null);
+    const crawlSkills = options?.skills ?? skillset;
+    const crawlExclude = options?.exclude ?? exclude;
+    const crawlDifficulty = options?.difficulty ?? difficulty;
     try {
       const res = await fetch("/api/crawl", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jd: jdValue, skills: skillset, exclude, difficulty }),
+        body: JSON.stringify({
+          jd: jdValue,
+          skills: crawlSkills,
+          exclude: crawlExclude,
+          difficulty: crawlDifficulty,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Crawl failed.");
@@ -178,7 +188,6 @@ export default function PipelineApp({
     setCritique(null);
     setScenarios([]);
     setSelectedScenarioIdx(0);
-    setShareUrl(null);
     if (useMock) {
       setScenarios([MOCK_SCENARIO]);
       return;
@@ -237,61 +246,11 @@ export default function PipelineApp({
     }
   }
 
-  async function shareScenario() {
-    if (!scenario || sharing) return;
-    setSharing(true);
-    setShareUrl(null);
-    try {
-      const pkg = {
-        id: scenario.id,
-        jobTitle: activeJobTitle || undefined,
-        markdown: "",
-        scenarios: [{ scenario, jobTitle: activeJobTitle || undefined }],
-        assessmentScenarios: [
-          {
-            id: scenario.id,
-            jobTitle: activeJobTitle || undefined,
-            candidatePrompt: scenario.brief,
-            todos: scenario.todos ?? [],
-            scope: scenario.scope ?? { focus: [], skip: [] },
-            focusAreas: scenario.focusAreas,
-            sourceTitle: scenario.groundedOn?.title,
-            sourceUrl: scenario.groundedOn?.source,
-            derivedFrom: scenario.derivedFrom,
-          },
-        ],
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem(
-        `question_arena_assessment:${scenario.id}`,
-        JSON.stringify(pkg)
-      );
-      await fetch("/api/assessments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pkg),
-      });
-      const url = `${window.location.origin}/assessment?assessment=${scenario.id}`;
-      setShareUrl(url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate share link.");
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  async function copyShareUrl() {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   // ---- JD gate (shown on launch) ----
   if (!gateDone) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4">
-        <div className="w-full max-w-xl space-y-4 rounded-xl border border-slate-800 bg-surface p-6 shadow-2xl">
+      <div className="hr-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="hr-modal-panel w-full max-w-xl space-y-4 rounded-xl p-6">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-xl font-semibold">Start with a Job Description</h2>
@@ -347,18 +306,10 @@ export default function PipelineApp({
 
   const selected = incidents.find((i) => i.id === selectedId);
   const managerSignals =
-    scenario?.derivedFrom.teamInput
+    scenario?.derivedFrom?.teamInput
       ?.map((member) => member.description.trim())
       .filter(Boolean)
       .slice(0, 2) ?? [];
-  const managerFocus =
-    scenario?.focusAreas?.slice(0, 4) ??
-    skillset
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 4);
-
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ---- Left: context + incident selection ---- */}
@@ -407,9 +358,10 @@ export default function PipelineApp({
               setCritique(null);
               setIncidents([]);
               setPlan(null);
+              setActiveJobId(job.id);
               setActiveJobTitle(job.title);
               setSelectedJobId("");
-              if (!useMock) runCrawl(job.jd);
+              if (!useMock) runCrawl(job.jd, { skills: job.skills || "" });
             }}
           >
             <option value="">Load from My Jobs…</option>
@@ -656,6 +608,7 @@ export default function PipelineApp({
                   onClick={() =>
                     onSave({
                       savedAt: new Date().toISOString(),
+                      jobId: activeJobId || undefined,
                       jobTitle: activeJobTitle || undefined,
                       jd,
                       sourceTitle: scenario.groundedOn?.title,
@@ -666,21 +619,9 @@ export default function PipelineApp({
                   }
                   className="btn-ghost"
                 >
-                  <BookmarkPlus className="h-4 w-4" /> Save to library
+                  <BookmarkPlus className="h-4 w-4" /> Save scenario and continue
                 </button>
               )}
-              <button
-                onClick={shareScenario}
-                disabled={sharing}
-                className="btn-ghost"
-              >
-                {sharing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Link2 className="h-4 w-4" />
-                )}
-                Generate candidate link
-              </button>
               <button
                 onClick={() => { runCritique(); setOutputTab("rubric"); }}
                 disabled={loading !== null}
@@ -712,7 +653,6 @@ export default function PipelineApp({
                 onClick={() => {
                   setSelectedScenarioIdx(i);
                   setCritique(null);
-                  setShareUrl(null);
                 }}
                 className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
                   i === selectedScenarioIdx
@@ -748,7 +688,7 @@ export default function PipelineApp({
                   </p>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3">
                   <div className="rounded-lg border border-slate-800 bg-background p-4">
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                       Manager persona
@@ -771,23 +711,6 @@ export default function PipelineApp({
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-slate-800 bg-background p-4">
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      What this assesses
-                    </h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="rounded-full border border-slate-600 bg-surface px-2 py-0.5 text-xs font-medium capitalize text-slate-300">
-                        {scenario.difficulty}
-                      </span>
-                      {managerFocus.map((f) => (
-                        <Tag key={f}>{f}</Tag>
-                      ))}
-                    </div>
-                    <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                      The candidate should reduce ambiguity through focused questions,
-                      then decide the next immediate step.
-                    </p>
-                  </div>
                 </div>
 
                 {scenario.groundedOn && (
@@ -868,24 +791,6 @@ export default function PipelineApp({
                   ))}
                 </div>
 
-                {/* Share URL */}
-                {shareUrl && (
-                  <div className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 p-3">
-                    <p className="mb-1.5 text-xs font-medium text-emerald-200">
-                      Candidate link ready — send this to the candidate.
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        readOnly
-                        value={shareUrl}
-                        className="input flex-1 font-mono text-xs"
-                      />
-                      <button onClick={copyShareUrl} className="btn-ghost shrink-0">
-                        {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : "Copy"}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="flex h-full items-center justify-center">

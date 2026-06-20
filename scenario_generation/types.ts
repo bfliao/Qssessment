@@ -84,6 +84,7 @@ export interface CritiqueOutput {
 }
 
 export interface CandidateApplication {
+  jobId?: string;
   jobTitle: string;
   appliedAt: string;
   assessmentsSent: string[]; // UUIDs
@@ -110,6 +111,7 @@ export interface SavedJob {
 
 export interface SavedScenario {
   savedAt: string;
+  jobId?: string;
   jobTitle?: string;
   jd: string;
   sourceTitle?: string;

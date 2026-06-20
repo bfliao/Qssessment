@@ -16,8 +16,8 @@ export default function ScenariosTab({
   if (saved.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-800 p-12 text-center text-sm text-slate-500">
-        No saved scenarios yet. Generate one in Build Assessment and click&nbsp;
-        <span className="text-slate-400">Save to library</span>.
+        No saved scenarios yet. Open a job, build a scenario, then click&nbsp;
+        <span className="text-slate-400">Save scenario and continue</span>.
       </div>
     );
   }

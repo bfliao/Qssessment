@@ -1,21 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Eye,
   Plus,
   Pencil,
+  RefreshCw,
   Trash2,
   X,
   Send,
   Briefcase,
 } from "lucide-react";
+import { ScenarioReportView } from "@/components/ScenarioReportView";
 import type {
   Candidate,
   CandidateApplication,
+  SavedJob,
   SavedScenario,
 } from "@/scenario_generation/types";
+import type { ScenarioReportData } from "@/lib/managerReport/types";
 
 // ── Markdown renderer ──────────────────────────────────────────────────────
 
@@ -93,6 +98,7 @@ function isScenarioSendable(scenario: SavedScenario) {
 function buildAssessmentScenarios(scenarios: SavedScenario[]) {
   return scenarios.map((saved) => ({
     id: saved.scenario.id,
+    jobId: saved.jobId,
     jobTitle: saved.jobTitle,
     candidatePrompt: saved.scenario.brief,
     todos: saved.scenario.todos ?? [],
@@ -119,6 +125,7 @@ function createAssessmentPackage(
     id: uuid,
     candidateName: candidate.name,
     candidateEmail: candidate.email,
+    jobId: app.jobId,
     jobTitle: app.jobTitle,
     targetRole: app.jobTitle,
     markdown,
@@ -153,6 +160,14 @@ function generateUUID(): string {
   });
 }
 
+interface AssessmentLookup {
+  id: string;
+  candidateName?: string;
+  status?: "sent" | "submitted" | "report_ready";
+  reportGeneratedAt?: string;
+  managerReport?: ScenarioReportData;
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function CandidatesTab({
@@ -165,7 +180,7 @@ export default function CandidatesTab({
 }: {
   candidates: Candidate[];
   savedScenarios: SavedScenario[];
-  jobs: { title: string }[];
+  jobs: SavedJob[];
   onAdd: (c: Candidate) => void;
   onUpdate: (c: Candidate) => void;
   onDelete: (id: string) => void;
@@ -177,9 +192,14 @@ export default function CandidatesTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-400">
-          Assign generated assessments and copy candidate-ready links.
+          Add candidates, assign saved scenarios, and copy candidate-ready links.
         </p>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} className="btn-primary">
+        <button
+          onClick={() => { setEditing(null); setShowForm(true); }}
+          disabled={jobs.length === 0}
+          title={jobs.length === 0 ? "Create a job before adding candidates." : undefined}
+          className="btn-primary"
+        >
           <Plus className="h-4 w-4" /> Add candidate
         </button>
       </div>
@@ -200,7 +220,15 @@ export default function CandidatesTab({
 
       {candidates.length === 0 && !showForm ? (
         <div className="rounded-xl border border-dashed border-slate-800 p-12 text-center text-sm text-slate-500">
-          No candidates yet. Click <span className="text-slate-400">Add candidate</span> to get started.
+          {jobs.length === 0 ? (
+            <>
+              Create a job first, then add candidates for that job.
+            </>
+          ) : (
+            <>
+              No candidates yet. Click <span className="text-slate-400">Add candidate</span> to get started.
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -230,7 +258,7 @@ function CandidateForm({
   onCancel,
 }: {
   initial: Candidate | null;
-  jobs: { title: string }[];
+  jobs: SavedJob[];
   onSave: (c: Candidate) => void;
   onCancel: () => void;
 }) {
@@ -238,9 +266,12 @@ function CandidateForm({
   const [email, setEmail] = useState(initial?.email ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const selectedJob = jobs.find((job) => job.id === selectedJobId);
 
   function handleSubmit() {
     if (!name.trim() || !email.trim()) return;
+    if (!initial && !selectedJob) return;
     onSave({
       id: initial?.id ?? `cand_${Date.now().toString(36)}`,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
@@ -248,7 +279,16 @@ function CandidateForm({
       email: email.trim(),
       phone: phone.trim() || undefined,
       notes: notes.trim() || undefined,
-      applications: initial?.applications ?? [],
+      applications: initial?.applications ?? (
+        selectedJob
+          ? [{
+              jobId: selectedJob.id,
+              jobTitle: selectedJob.title,
+              appliedAt: new Date().toISOString(),
+              assessmentsSent: [],
+            }]
+          : []
+      ),
     });
   }
 
@@ -275,10 +315,33 @@ function CandidateForm({
       <FormField label="Notes">
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input" placeholder="Referral source, recruiter notes…" />
       </FormField>
+      {!initial && (
+        <FormField label="Job *">
+          <select
+            value={selectedJobId}
+            onChange={(e) => setSelectedJobId(e.target.value)}
+            className="input"
+            disabled={jobs.length === 0}
+          >
+            <option value="">
+              {jobs.length === 0 ? "Create a job first" : "Select a saved job..."}
+            </option>
+            {jobs.map((job) => (
+              <option key={job.id} value={job.id}>
+                {job.title}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      )}
 
       <div className="flex justify-end gap-2">
         <button onClick={onCancel} className="btn-ghost">Cancel</button>
-        <button onClick={handleSubmit} disabled={!name.trim() || !email.trim()} className="btn-primary">
+        <button
+          onClick={handleSubmit}
+          disabled={!name.trim() || !email.trim() || (!initial && !selectedJob)}
+          className="btn-primary"
+        >
           {initial ? "Save changes" : "Add candidate"}
         </button>
       </div>
@@ -298,27 +361,39 @@ function CandidateRow({
 }: {
   candidate: Candidate;
   savedScenarios: SavedScenario[];
-  jobs: { title: string }[];
+  jobs: SavedJob[];
   onEdit: () => void;
   onDelete: () => void;
   onUpdate: (c: Candidate) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [addingJob, setAddingJob] = useState(false);
-  const [newJobTitle, setNewJobTitle] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState("");
   const [sendModal, setSendModal] = useState<CandidateApplication | null>(null);
+  const availableJobs = jobs.filter(
+    (job) =>
+      !candidate.applications.some((app) =>
+        app.jobId ? app.jobId === job.id : app.jobTitle === job.title
+      )
+  );
 
   function addApplication() {
-    if (!newJobTitle.trim()) return;
+    const job = jobs.find((candidateJob) => candidateJob.id === selectedJobId);
+    if (!job) return;
     const updated: Candidate = {
       ...candidate,
       applications: [
         ...candidate.applications,
-        { jobTitle: newJobTitle.trim(), appliedAt: new Date().toISOString(), assessmentsSent: [] },
+        {
+          jobId: job.id,
+          jobTitle: job.title,
+          appliedAt: new Date().toISOString(),
+          assessmentsSent: [],
+        },
       ],
     };
     onUpdate(updated);
-    setNewJobTitle("");
+    setSelectedJobId("");
     setAddingJob(false);
   }
 
@@ -334,7 +409,9 @@ function CandidateRow({
     const updated: Candidate = {
       ...candidate,
       applications: candidate.applications.map((a) =>
-        a === app ? { ...a, assessmentsSent: [...a.assessmentsSent, uuid] } : a
+        a === app || (app.jobId ? a.jobId === app.jobId : a.jobTitle === app.jobTitle)
+          ? { ...a, assessmentsSent: [...a.assessmentsSent, uuid] }
+          : a
       ),
     };
     onUpdate(updated);
@@ -387,24 +464,22 @@ function CandidateRow({
               <div className="flex gap-2">
                 <select
                   className="input flex-1 text-xs"
-                  value={newJobTitle}
-                  onChange={(e) => setNewJobTitle(e.target.value)}
+                  value={selectedJobId}
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                  disabled={availableJobs.length === 0}
                 >
-                  <option value="">Select a job…</option>
-                  {jobs.map((j) => (
-                    <option key={j.title} value={j.title}>{j.title}</option>
+                  <option value="">
+                    {jobs.length === 0
+                      ? "Create a job first"
+                      : availableJobs.length === 0
+                        ? "All saved jobs added"
+                        : "Select a saved job..."}
+                  </option>
+                  {availableJobs.map((job) => (
+                    <option key={job.id} value={job.id}>{job.title}</option>
                   ))}
-                  <option value="__custom__">Custom…</option>
                 </select>
-                {newJobTitle === "__custom__" && (
-                  <input
-                    className="input flex-1 text-xs"
-                    placeholder="Job title"
-                    onChange={(e) => setNewJobTitle(e.target.value)}
-                    autoFocus
-                  />
-                )}
-                <button onClick={addApplication} disabled={!newJobTitle || newJobTitle === "__custom__"} className="btn-primary text-xs py-1 px-3">
+                <button onClick={addApplication} disabled={!selectedJobId} className="btn-primary text-xs py-1 px-3">
                   Add
                 </button>
                 <button onClick={() => setAddingJob(false)} className="btn-ghost text-xs py-1 px-2">
@@ -472,9 +547,10 @@ function ApplicationRow({
   const [lastAssessmentUrl, setLastAssessmentUrl] = useState("");
 
   // Scenarios for this job
-  const relevantScenarios = savedScenarios.filter(
-    (s) => !s.jobTitle || s.jobTitle === app.jobTitle
-  );
+  const relevantScenarios = savedScenarios.filter((scenario) => {
+    if (app.jobId && scenario.jobId) return scenario.jobId === app.jobId;
+    return !scenario.jobTitle || scenario.jobTitle === app.jobTitle;
+  });
 
   return (
     <div className="rounded-lg border border-slate-800 bg-background p-3 space-y-2">
@@ -493,7 +569,7 @@ function ApplicationRow({
             onClick={() => setSendModal(isOpen ? null : app)}
             className="btn-primary text-xs py-1 px-3"
           >
-            <Send className="h-3 w-3" /> Generate assessment link
+            <Send className="h-3 w-3" /> Assign assessment
           </button>
           <button onClick={onRemove} className="text-slate-600 hover:text-red-400">
             <Trash2 className="h-3.5 w-3.5" />
@@ -506,7 +582,6 @@ function ApplicationRow({
         <SendAssessmentPanel
           jobTitle={app.jobTitle}
           scenarios={relevantScenarios}
-          allScenarios={savedScenarios}
           onSend={async (scenarios) => {
             const url = await onSend(scenarios);
             if (url) setLastAssessmentUrl(url);
@@ -518,9 +593,9 @@ function ApplicationRow({
 
       {/* Historical sent ids. These may predate the shareable-link store. */}
       {app.assessmentsSent.length > 0 && (
-        <div className="space-y-0.5">
+        <div className="space-y-2">
           {app.assessmentsSent.map((uuid) => (
-            <p key={uuid} className="font-mono text-xs text-slate-600">{uuid}</p>
+            <AssessmentReportStatus key={uuid} uuid={uuid} />
           ))}
         </div>
       )}
@@ -528,7 +603,7 @@ function ApplicationRow({
       {lastAssessmentUrl && (
         <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 p-2">
           <p className="mb-1 text-xs font-semibold text-emerald-200">
-            Assessment generated. Please send this link to the candidate.
+            Candidate link created.
           </p>
           <div className="flex gap-2">
             <input
@@ -541,7 +616,7 @@ function ApplicationRow({
               onClick={() => navigator.clipboard.writeText(lastAssessmentUrl)}
               className="btn-ghost shrink-0"
             >
-              Copy
+              Copy link
             </button>
             <a
               href={lastAssessmentUrl}
@@ -558,18 +633,100 @@ function ApplicationRow({
   );
 }
 
+function AssessmentReportStatus({ uuid }: { uuid: string }) {
+  const [assessment, setAssessment] = useState<AssessmentLookup | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+
+  async function loadAssessment() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/assessments?id=${encodeURIComponent(uuid)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = (await res.json()) as { assessment: AssessmentLookup };
+      setAssessment(data.assessment);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load status.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadAssessment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uuid]);
+
+  const report = assessment?.managerReport;
+  const ready = Boolean(report);
+  const statusText = ready
+    ? "Report ready"
+    : assessment?.status === "submitted"
+      ? "Submitted"
+      : "Sent";
+  const badgeClass = ready
+    ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-200"
+    : "border-slate-700 bg-slate-900/40 text-slate-400";
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/30 p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-xs text-slate-500">{uuid}</p>
+          {assessment?.reportGeneratedAt && (
+            <p className="mt-0.5 text-xs text-slate-600">
+              Report generated {new Date(assessment.reportGeneratedAt).toLocaleString()}
+            </p>
+          )}
+          {error && <p className="mt-1 text-xs text-red-300">{error}</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full border px-2 py-1 text-xs ${badgeClass}`}>
+            {loading ? "Checking..." : statusText}
+          </span>
+          <button
+            type="button"
+            onClick={() => void loadAssessment()}
+            className="btn-ghost px-2 py-1 text-xs"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+          {ready && (
+            <button
+              type="button"
+              onClick={() => setOpen((current) => !current)}
+              className="btn-primary px-3 py-1 text-xs"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              {open ? "Hide report" : "View report"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {open && report && (
+        <div className="mt-3 overflow-hidden rounded-lg border border-slate-800 bg-white/80 p-3">
+          <ScenarioReportView data={report} embedded />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Send assessment panel ──────────────────────────────────────────────────
 
 function SendAssessmentPanel({
   jobTitle,
   scenarios,
-  allScenarios,
   onSend,
   onCancel,
 }: {
   jobTitle: string;
   scenarios: SavedScenario[];
-  allScenarios: SavedScenario[];
   onSend: (scenarios: SavedScenario[]) => Promise<string | undefined>;
   onCancel: () => void;
 }) {
@@ -585,24 +742,24 @@ function SendAssessmentPanel({
     });
   }
 
-  const chosenScenarios = allScenarios.filter((s) => selected.has(s.scenario.id));
+  const chosenScenarios = scenarios.filter((s) => selected.has(s.scenario.id));
 
   return (
     <div className="rounded-lg border border-slate-700 bg-surface p-4 space-y-3 mt-1">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Select scenarios to include
+          Select scenarios for {jobTitle}
         </span>
         <button onClick={onCancel} className="text-slate-500 hover:text-slate-200">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {allScenarios.length === 0 ? (
-        <p className="text-xs text-slate-500">No saved scenarios. Generate one in Build Assessment first.</p>
+      {scenarios.length === 0 ? (
+        <p className="text-xs text-slate-500">No saved scenarios for this job yet. Build one from the job first.</p>
       ) : (
         <div className="space-y-1 max-h-48 overflow-y-auto">
-          {allScenarios.map((s) => (
+          {scenarios.map((s) => (
             <label key={s.scenario.id} className="flex items-start gap-2 cursor-pointer rounded px-2 py-1.5 hover:bg-slate-800/40">
               <input
                 type="checkbox"
@@ -626,7 +783,7 @@ function SendAssessmentPanel({
 
       <div className="flex items-center justify-between pt-1">
         <span className="text-xs text-slate-500">
-          {chosenScenarios.length} selected → 1 candidate link
+          {chosenScenarios.length} selected for 1 candidate link
         </span>
         <button
           onClick={async () => {
@@ -648,7 +805,7 @@ function SendAssessmentPanel({
               setError(
                 err instanceof Error
                   ? err.message
-                  : "Could not generate assessment link."
+                  : "Could not create candidate link."
               );
             } finally {
               setGenerating(false);
@@ -658,7 +815,7 @@ function SendAssessmentPanel({
           className="btn-primary text-xs py-1.5 px-4"
         >
           <Send className="h-3.5 w-3.5" />
-          {generating ? "Generating..." : "Generate link"}
+          {generating ? "Creating..." : "Create candidate link"}
         </button>
       </div>
       {error && <p className="text-xs text-red-300">{error}</p>}

@@ -36,40 +36,13 @@ function persistCandidates(list: Candidate[]) {
 }
 
 type Tab = "playground" | "scenarios" | "jobs" | "candidates";
-type CoreStep = "jobs" | "playground" | "candidates";
 
 const TAB_LABELS: Record<Tab, (counts: Record<Tab, number>) => string> = {
-  playground: () => "Build Assessment",
+  playground: () => "Scenario Builder",
   scenarios: (c) => `Scenario Library${c.scenarios ? ` (${c.scenarios})` : ""}`,
   jobs: (c) => `Jobs${c.jobs ? ` (${c.jobs})` : ""}`,
   candidates: (c) => `Candidates${c.candidates ? ` (${c.candidates})` : ""}`,
 };
-
-const CORE_STEPS: Array<{
-  tab: CoreStep;
-  number: string;
-  label: string;
-  helper: string;
-}> = [
-  {
-    tab: "jobs",
-    number: "1",
-    label: "Create a job",
-    helper: "Role, JD, and team expectations",
-  },
-  {
-    tab: "playground",
-    number: "2",
-    label: "Generate a scenario",
-    helper: "Evidence-backed workplace task",
-  },
-  {
-    tab: "candidates",
-    number: "3",
-    label: "Invite a candidate",
-    helper: "Create the assessment link",
-  },
-];
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("jobs");
@@ -134,18 +107,6 @@ export default function Home() {
     setTab("playground");
   }, []);
 
-  const activeCoreStep: CoreStep =
-    tab === "jobs" || tab === "playground" || tab === "candidates"
-      ? tab
-      : "playground";
-  const completedSteps = {
-    jobs: jobs.length > 0,
-    playground: saved.length > 0,
-    candidates: candidates.some((candidate) =>
-      candidate.applications.some((app) => app.assessmentsSent.length > 0)
-    ),
-  };
-
   const handleAddCandidate = useCallback((c: Candidate) => {
     setCandidates((prev) => {
       const next = [c, ...prev];
@@ -182,7 +143,7 @@ export default function Home() {
             ByteCoder
           </div>
           <nav className="hr-tabs" aria-label="Dashboard sections">
-            {(["jobs", "playground", "candidates", "scenarios"] as Tab[]).map((t) => (
+            {(["jobs", "candidates", "scenarios"] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -193,31 +154,6 @@ export default function Home() {
             ))}
           </nav>
         </header>
-
-        <div className="hr-guide hr-glass">
-          {CORE_STEPS.map((step) => {
-            const active = activeCoreStep === step.tab;
-            const complete = completedSteps[step.tab];
-            return (
-              <button
-                key={step.tab}
-                type="button"
-                onClick={() => setTab(step.tab)}
-                className={`hr-guide-step ${active ? "active" : ""} ${
-                  complete ? "done" : ""
-                }`}
-              >
-                <span className="hr-guide-num">
-                  {complete && !active ? "✓" : step.number}
-                </span>
-                <div>
-                  <p>{step.label}</p>
-                  <small>{step.helper}</small>
-                </div>
-              </button>
-            );
-          })}
-        </div>
 
         <section className="hr-view">
           {tab === "playground" ? (

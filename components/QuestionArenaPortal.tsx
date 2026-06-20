@@ -15,6 +15,7 @@ import {
   scoreInformationGain,
 } from "@/lib/questionArena/answerer";
 import { ConceptCoverageGraph } from "@/components/ConceptCoverageGraph";
+import demoRunHistory from "@/data/scenarios/user-api-export-run-history.json";
 import type {
   GatekeeperDecision,
   Message,
@@ -39,10 +40,15 @@ interface StoredAssessmentPackage {
   id: string;
   candidateName?: string;
   candidateEmail?: string;
+  jobId?: string;
   jobTitle?: string;
   markdown: string;
   targetRole?: string;
   createdAt: string;
+  status?: "sent" | "submitted" | "report_ready";
+  submittedAt?: string;
+  reportGeneratedAt?: string;
+  finalRecommendation?: string;
   assessmentScenarios?: StoredAssessmentScenario[];
   scenarios?: StoredRawSavedScenario[];
 }
@@ -91,6 +97,28 @@ interface StoredRawSavedScenario {
       source?: string;
     };
   };
+}
+
+interface DemoHistoryRun {
+  id: string;
+  candidateName: string;
+  submittedLabel: string;
+  unlockedFactIds: string[];
+  messages: Message[];
+  finalRecommendation: string;
+  summary: string;
+}
+
+interface DemoRunHistoryFixture {
+  scenarioId: string;
+  runs: DemoHistoryRun[];
+}
+
+interface ManagerEvaluationRun extends DemoHistoryRun {
+  percent: number;
+  label: string;
+  questionCount: number;
+  isCurrent?: boolean;
 }
 
 type InterviewPhase =
@@ -615,6 +643,372 @@ function buildLocalConnectionLeakReport(
   };
 }
 
+const typedDemoRunHistory = demoRunHistory as DemoRunHistoryFixture;
+
+function historyRunsForScenario(scenario: ScenarioConfig): ManagerEvaluationRun[] {
+  if (scenario.id !== typedDemoRunHistory.scenarioId) return [];
+
+  const validFactIds = new Set(scenario.hiddenFacts.map((fact) => fact.id));
+
+  return typedDemoRunHistory.runs.map((run) => {
+    const unlockedFactIds = run.unlockedFactIds.filter((id) =>
+      validFactIds.has(id)
+    );
+    const deterministic = scoreInformationGain(scenario, unlockedFactIds);
+
+    return {
+      ...run,
+      unlockedFactIds,
+      percent: deterministic.percent,
+      label: deterministic.label,
+      questionCount: run.messages.filter((message) => message.role === "candidate")
+        .length,
+    };
+  });
+}
+
+function currentEvaluationRun({
+  candidateName,
+  report,
+  messages,
+  unlockedFactIds,
+  finalRecommendation,
+  questionCount,
+}: {
+  candidateName: string;
+  report: ValidatorReport;
+  messages: Message[];
+  unlockedFactIds: string[];
+  finalRecommendation: string;
+  questionCount: number;
+}): ManagerEvaluationRun {
+  return {
+    id: "current-candidate-run",
+    candidateName,
+    submittedLabel: "Current submission",
+    unlockedFactIds,
+    messages,
+    finalRecommendation,
+    summary: report.assessment.summary,
+    percent: report.deterministic.percent,
+    label: report.assessment.label,
+    questionCount,
+    isCurrent: true,
+  };
+}
+
+function scoreColorClass(percent: number) {
+  if (percent >= 75) return "bg-[#1f7a56] text-white";
+  if (percent >= 45) return "bg-[#d8a646] text-[#2b2540]";
+  return "bg-[#c85647] text-white";
+}
+
+function coverageBarClass(percent: number) {
+  if (percent >= 75) return "bg-[#33c989]";
+  if (percent >= 45) return "bg-[#d8a646]";
+  return "bg-[#c85647]";
+}
+
+function ManagerEvaluationView({
+  scenario,
+  report,
+  messages,
+  unlockedFactIds,
+  finalRecommendation,
+  candidateQuestionCount,
+  candidateName,
+}: {
+  scenario: ScenarioConfig;
+  report: ValidatorReport;
+  messages: Message[];
+  unlockedFactIds: string[];
+  finalRecommendation: string;
+  candidateQuestionCount: number;
+  candidateName: string;
+}) {
+  const historicalRuns = useMemo(
+    () => historyRunsForScenario(scenario),
+    [scenario]
+  );
+  const currentRun = useMemo(
+    () =>
+      currentEvaluationRun({
+        candidateName,
+        report,
+        messages,
+        unlockedFactIds,
+        finalRecommendation,
+        questionCount: candidateQuestionCount,
+      }),
+    [
+      candidateName,
+      candidateQuestionCount,
+      finalRecommendation,
+      messages,
+      report,
+      unlockedFactIds,
+    ]
+  );
+  const allRuns = useMemo(
+    () => [currentRun, ...historicalRuns],
+    [currentRun, historicalRuns]
+  );
+  const [selectedRunId, setSelectedRunId] = useState(currentRun.id);
+
+  useEffect(() => {
+    if (allRuns.some((run) => run.id === selectedRunId)) return;
+    setSelectedRunId(currentRun.id);
+  }, [allRuns, currentRun.id, selectedRunId]);
+
+  const selectedRun =
+    allRuns.find((run) => run.id === selectedRunId) || currentRun;
+  const averagePercent =
+    allRuns.length === 0
+      ? report.deterministic.percent
+      : Math.round(
+          allRuns.reduce((sum, run) => sum + run.percent, 0) / allRuns.length
+        );
+  const currentRank =
+    [...allRuns].sort((a, b) => b.percent - a.percent).findIndex(
+      (run) => run.id === currentRun.id
+    ) + 1;
+  const rootCauseReached = unlockedFactIds.includes(
+    "missing_release_on_error_path"
+  );
+  const mitigationReached = unlockedFactIds.includes("disable_export_first");
+  const preventionReached = unlockedFactIds.includes(
+    "prevention_error_path_tests"
+  );
+  const signalBreakdown = report.assessment.signalBreakdown;
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[24px] border border-white/75 bg-white/65 p-6 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+              Manager review
+            </p>
+            <h1 className="mt-2 text-[34px] font-extrabold leading-tight tracking-[-0.035em] text-[#17171c]">
+              {candidateName} evaluation
+            </h1>
+            <p className="mt-2 max-w-3xl text-[15px] font-medium leading-7 text-[#3a3a42]">
+              Candidate flow complete. This review uses the deterministic
+              local rubric for the backend connection-leak scenario and compares
+              the current run against seeded demo history.
+            </p>
+          </div>
+          <div
+            className={`rounded-full px-5 py-3 text-lg font-black ${scoreColorClass(
+              report.deterministic.percent
+            )}`}
+          >
+            {report.deterministic.percent}%
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Score label", report.assessment.label],
+            [
+              "Facts unlocked",
+              `${unlockedFactIds.length}/${scenario.hiddenFacts.length}`,
+            ],
+            ["Questions", `${candidateQuestionCount}/${scenario.maxQuestions}`],
+            ["History rank", `${currentRank}/${allRuns.length}`],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-[16px] border border-black/10 bg-white/45 p-4"
+            >
+              <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
+                {label}
+              </p>
+              <p className="mt-1 text-[15px] font-black text-[#17171c]">
+                {value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(340px,0.7fr)]">
+        <section className="rounded-[24px] border border-[#23252E] bg-[#0f1016] p-5 shadow-[0_24px_60px_rgba(38,38,54,.18)]">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8B8F9A]">
+                Current candidate graph
+              </p>
+              <h2 className="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-[#E7E8EC]">
+                Concept coverage
+              </h2>
+            </div>
+            <div className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-[#8B8F9A]">
+              Root cause {rootCauseReached ? "reached" : "missed"}
+            </div>
+          </div>
+          <ConceptCoverageGraph
+            scenario={scenario}
+            unlockedFactIds={unlockedFactIds}
+            messages={messages}
+            candidateName={candidateName}
+          />
+        </section>
+
+        <aside className="space-y-5">
+          <section className="rounded-[24px] border border-white/75 bg-white/65 p-5 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+                  Run history
+                </p>
+                <h2 className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-[#17171c]">
+                  Same scenario
+                </h2>
+              </div>
+              <span className="rounded-full border border-black/10 bg-white/50 px-3 py-1 text-xs font-black text-[#6e6e78]">
+                Avg {averagePercent}%
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {allRuns.map((run) => (
+                <button
+                  type="button"
+                  key={run.id}
+                  onClick={() => setSelectedRunId(run.id)}
+                  className={`w-full rounded-[16px] border p-3 text-left transition ${
+                    selectedRunId === run.id
+                      ? "border-[#17171c] bg-white"
+                      : "border-black/10 bg-white/45 hover:bg-white/70"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-[#17171c]">
+                        {run.candidateName}
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold text-[#8a83a6]">
+                        {run.submittedLabel}
+                        {run.isCurrent ? " - live" : ""}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-black ${scoreColorClass(
+                        run.percent
+                      )}`}
+                    >
+                      {run.percent}%
+                    </span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10">
+                    <div
+                      className={`h-full rounded-full ${coverageBarClass(
+                        run.percent
+                      )}`}
+                      style={{ width: `${Math.max(4, run.percent)}%` }}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[#23252E] bg-[#0f1016] p-4 shadow-[0_24px_60px_rgba(38,38,54,.18)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8B8F9A]">
+              Selected run graph
+            </p>
+            <ConceptCoverageGraph
+              scenario={scenario}
+              unlockedFactIds={selectedRun.unlockedFactIds}
+              messages={selectedRun.messages}
+              candidateName={selectedRun.candidateName}
+              compact
+              className="mt-3"
+            />
+          </section>
+        </aside>
+      </div>
+
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="rounded-[24px] border border-white/75 bg-white/65 p-5 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+            Evaluation evidence
+          </p>
+          <p className="mt-3 rounded-[16px] border border-black/10 bg-white/45 p-4 text-[14px] font-medium leading-6 text-[#3a3a42]">
+            {report.assessment.summary}
+          </p>
+
+          {signalBreakdown && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {[
+                ["Question quality", signalBreakdown.questionQuality],
+                ["Adaptive follow-up", signalBreakdown.adaptiveFollowUp],
+                ["Ownership posture", signalBreakdown.ownershipPosture],
+                ["Grounded next step", signalBreakdown.groundedNextStep],
+              ].map(([title, signal]) => (
+                <div
+                  key={title as string}
+                  className="rounded-[16px] border border-black/10 bg-white/45 p-4"
+                >
+                  <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
+                    {title as string}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-[#17171c]">
+                    {(signal as { label: string }).label}
+                  </p>
+                  <p className="mt-1 text-[13px] font-medium leading-6 text-[#5a5470]">
+                    {(signal as { assessment: string }).assessment}
+                  </p>
+                  <p className="mt-2 text-xs font-medium leading-5 text-[#8a83a6]">
+                    {(signal as { evidence: string }).evidence}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-5">
+          <section className="rounded-[24px] border border-white/75 bg-white/65 p-5 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+              Manager readout
+            </p>
+            <div className="mt-3 space-y-2">
+              {[
+                ["Root cause", rootCauseReached ? "Reached" : "Missed"],
+                ["Mitigation", mitigationReached ? "Reached" : "Missed"],
+                ["Prevention", preventionReached ? "Reached" : "Missed"],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between rounded-[14px] border border-black/10 bg-white/45 px-3 py-2"
+                >
+                  <span className="text-xs font-black uppercase tracking-[0.1em] text-[#a6a6b0]">
+                    {label}
+                  </span>
+                  <span className="text-sm font-black text-[#17171c]">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-white/75 bg-white/65 p-5 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+              Next step submitted
+            </p>
+            <p className="mt-3 text-sm font-medium leading-6 text-[#3a3a42]">
+              {finalRecommendation}
+            </p>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function QuestionArenaPortal({
   scenarios,
   defaultProcessorPrompt,
@@ -628,6 +1022,7 @@ export default function QuestionArenaPortal({
   const [targetRole, setTargetRole] = useState(
     scenarios[0]?.role ?? "New Grad Software Engineer"
   );
+  const [candidateName, setCandidateName] = useState("Candidate");
   const [rawStoryline, setRawStoryline] = useState(
     `Sam says: "Can you add a way for users to download their order history? Swamped today, thanks."
 
@@ -709,6 +1104,8 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     ? "grid items-start grid-cols-[minmax(360px,0.9fr)_minmax(440px,1.2fr)_minmax(260px,0.7fr)] gap-4 max-[1180px]:grid-cols-1"
     : "mx-auto grid w-full max-w-7xl grid-cols-1 items-start";
   const assessmentUnavailable = Boolean(assessmentLoadError);
+  const managerReviewOpen =
+    !devMode && interviewPhase === "submitted" && Boolean(report);
   const showTaskDrop =
     !devMode && interviewPhase === "task_drop" && !assessmentUnavailable;
   const showGreeting =
@@ -735,7 +1132,9 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     : "min-h-screen overflow-x-hidden bg-[linear-gradient(155deg,#edecea_0%,#e7e8eb_55%,#e9e7e4_100%)] px-4 py-7 text-[#17171c]";
   const interviewShellClassName = devMode
     ? "relative grid min-h-[calc(100vh-2rem)] overflow-hidden rounded-lg border border-slate-800 bg-surface shadow-2xl shadow-slate-950/40 lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]"
-    : "relative mx-auto w-full max-w-[600px]";
+    : managerReviewOpen
+      ? "relative mx-auto w-full max-w-6xl"
+      : "relative mx-auto w-full max-w-[600px]";
 
   function resetRun(nextScenario = scenario) {
     setMessages([]);
@@ -902,6 +1301,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
 
         setRawStoryline(markdown);
         setTargetRole(role);
+        setCandidateName(stored.candidateName || "Candidate");
         setDevMode(false);
         setAssessmentLoadError("");
 
@@ -1031,7 +1431,11 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
         nextStep
       );
       setReport(data);
-      setStatus("Generated local demo report for the connection-leak scenario.");
+      const persistenceWarning = await persistManagerReport(data, nextStep);
+      setStatus(
+        persistenceWarning ||
+          "Generated local demo report for the connection-leak scenario."
+      );
       setInterviewPhase("submitted");
       return;
     }
@@ -1052,8 +1456,11 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as ValidatorReport;
       setReport(data);
+      const persistenceWarning = await persistManagerReport(data, nextStep);
       setStatus(
-        data.warning
+        persistenceWarning
+          ? persistenceWarning
+          : data.warning
           ? data.warning
           : `Validator report generated with ${data.modelUsed} (${data.source}).`
       );
@@ -1064,6 +1471,38 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
       );
     } finally {
       setLoadingEvaluation(false);
+    }
+  }
+
+  async function persistManagerReport(
+    validatorReport: ValidatorReport,
+    nextStep: string
+  ): Promise<string | null> {
+    if (!assessmentId) return null;
+
+    try {
+      const res = await fetch("/api/assessments/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assessmentId,
+          scenario,
+          candidateName,
+          messages,
+          unlockedFactIds,
+          finalRecommendation: nextStep,
+          validatorReport,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      return null;
+    } catch (error) {
+      return error instanceof Error
+        ? `Report generated, but manager dashboard save failed: ${error.message}`
+        : "Report generated, but manager dashboard save failed.";
     }
   }
 
@@ -1258,7 +1697,11 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
           </div>
         </div>
       ) : (
-        <div className="mx-auto mb-5 w-full max-w-[600px]">
+        <div
+          className={`mx-auto mb-5 w-full ${
+            managerReviewOpen ? "max-w-6xl" : "max-w-[600px]"
+          }`}
+        >
           <div className="grid grid-cols-4 gap-2 rounded-[28px] border border-white/75 bg-white/55 px-5 py-3 shadow-[0_10px_30px_rgba(38,38,54,.10),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
             {["Brief", "Investigate", "Decide", "Done"].map((label, index) => (
               <div key={label}>
@@ -1789,135 +2232,30 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                   </div>
                 )}
 
-                {interviewPhase === "submitted" && (
-                  <div className="space-y-5">
-                    <div className="w-full rounded-[28px] border border-white/75 bg-white/55 p-9 text-center shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
-                      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-white/75 bg-white/70 shadow-[0_10px_30px_rgba(38,38,54,.10)]">
-                        <CheckCircle2 className="h-8 w-8 text-[#3a8f63]" />
-                      </div>
-                      <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
+                {interviewPhase === "submitted" &&
+                  (report ? (
+                    <ManagerEvaluationView
+                      scenario={scenario}
+                      report={report}
+                      messages={messages}
+                      unlockedFactIds={unlockedFactIds}
+                      finalRecommendation={finalRecommendation}
+                      candidateQuestionCount={candidateQuestionCount}
+                      candidateName={candidateName}
+                    />
+                  ) : (
+                    <div className="rounded-[24px] border border-white/75 bg-white/65 p-8 text-center shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
                         Complete
                       </p>
                       <h1 className="mt-3 text-[32px] font-extrabold leading-tight tracking-[-0.035em] text-[#17171c]">
-                        Scenario complete
+                        Assessment submitted
                       </h1>
                       <p className="mt-3 text-[15px] font-medium leading-7 text-[#3a3a42]">
-                        Assessment submitted — your question path and next step
-                        have been recorded.
+                        Generating the manager evaluation view.
                       </p>
-                      <div className="mt-6 rounded-[18px] border border-black/10 bg-white/40 p-5 text-left">
-                        <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-sm leading-6">
-                          <span className="font-semibold text-[#a6a6b0]">
-                            Questions asked
-                          </span>
-                          <span className="font-medium text-[#3a3a42]">
-                            {candidateQuestionCount} of {scenario.maxQuestions}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-sm leading-6">
-                          <span className="font-semibold text-[#a6a6b0]">
-                            Your next step
-                          </span>
-                          <span className="font-medium text-[#3a3a42]">
-                            {finalRecommendation}
-                          </span>
-                        </div>
-                      </div>
                     </div>
-
-                    {report && (
-                      <div className="rounded-[28px] border border-white/75 bg-white/60 p-6 shadow-[0_24px_60px_rgba(38,38,54,.13),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
-                        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#6e6e78]">
-                              Evaluation report
-                            </p>
-                            <h2 className="mt-1 text-[24px] font-extrabold tracking-[-0.035em] text-[#17171c]">
-                              {report.assessment.label}
-                            </h2>
-                          </div>
-                          <div className="rounded-full bg-[#17171c] px-4 py-2 text-sm font-black text-white">
-                            {report.deterministic.percent}%
-                          </div>
-                        </div>
-
-                        <p className="rounded-[18px] border border-black/10 bg-white/45 p-4 text-left text-[14px] font-medium leading-6 text-[#3a3a42]">
-                          {report.assessment.summary}
-                        </p>
-
-                        <ConceptCoverageGraph
-                          scenario={scenario}
-                          unlockedFactIds={unlockedFactIds}
-                          messages={messages}
-                          candidateName="Candidate"
-                          compact
-                          className="mt-5 text-left"
-                        />
-
-                        {report.assessment.signalBreakdown && (
-                          <div className="mt-5 grid gap-3">
-                            {[
-                              [
-                                "Question quality",
-                                report.assessment.signalBreakdown.questionQuality,
-                              ],
-                              [
-                                "Adaptive follow-up",
-                                report.assessment.signalBreakdown.adaptiveFollowUp,
-                              ],
-                              [
-                                "Ownership posture",
-                                report.assessment.signalBreakdown.ownershipPosture,
-                              ],
-                              [
-                                "Grounded next step",
-                                report.assessment.signalBreakdown.groundedNextStep,
-                              ],
-                            ].map(([title, signal]) => (
-                              <div
-                                key={title as string}
-                                className="rounded-[16px] border border-black/10 bg-white/45 p-4 text-left"
-                              >
-                                <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
-                                  {title as string}
-                                </p>
-                                <p className="mt-1 text-sm font-black text-[#17171c]">
-                                  {(signal as { label: string }).label}
-                                </p>
-                                <p className="mt-1 text-[13px] font-medium leading-6 text-[#5a5470]">
-                                  {(signal as { assessment: string }).assessment}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-[16px] border border-black/10 bg-white/45 p-4 text-left">
-                            <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
-                              Strengths
-                            </p>
-                            <ul className="mt-2 space-y-2 text-[13px] font-medium leading-5 text-[#3a3a42]">
-                              {report.assessment.strengths.slice(0, 3).map((item, index) => (
-                                <li key={`strength-${index}`}>{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="rounded-[16px] border border-black/10 bg-white/45 p-4 text-left">
-                            <p className="text-[10.5px] font-black uppercase tracking-[0.13em] text-[#a6a6b0]">
-                              Watch-outs
-                            </p>
-                            <ul className="mt-2 space-y-2 text-[13px] font-medium leading-5 text-[#3a3a42]">
-                              {report.assessment.concerns.slice(0, 3).map((item, index) => (
-                                <li key={`concern-${index}`}>{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  ))}
               </>
             )}
           </>

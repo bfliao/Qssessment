@@ -1,15 +1,27 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "fs";
 import path from "path";
+import type { ScenarioReportData } from "@/lib/managerReport/types";
+import type { ValidatorReport } from "@/lib/questionArena/types";
+
+export type StoredAssessmentStatus = "sent" | "submitted" | "report_ready";
 
 export interface StoredAssessmentPackage {
   id: string;
   candidateName?: string;
   candidateEmail?: string;
+  jobId?: string;
   jobTitle?: string;
   markdown: string;
   targetRole?: string;
   createdAt: string;
+  status?: StoredAssessmentStatus;
+  submittedAt?: string;
+  reportGeneratedAt?: string;
+  finalRecommendation?: string;
+  managerReport?: ScenarioReportData;
+  validatorReport?: ValidatorReport;
   scenarios?: unknown;
+  assessmentScenarios?: unknown;
 }
 
 const globalForAssessments = globalThis as typeof globalThis & {
