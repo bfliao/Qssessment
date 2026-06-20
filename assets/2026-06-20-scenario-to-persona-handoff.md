@@ -10,6 +10,8 @@ Its job is to convert whatever the scenario team produces into a realistic answe
 
 This lets the team collaborate even while the scenario team's final output format is still unknown.
 
+The assessment should not be framed as a hidden puzzle where the candidate must collect every fact. The stronger signal is how the candidate asks, what perspective their question reveals, and whether they use each answer to form a sharper next question or next immediate step.
+
 ## Why This Layer Exists
 
 Question Arena needs the answerer to feel like a real workplace source, not a generic chatbot.
@@ -54,6 +56,8 @@ The processor generates these scenario-specific fields:
 - trap assumptions that a rushed candidate might make
 - ideal next step / recommendation
 
+The deterministic info-gain score is only the baseline. The evaluator should also look for question quality, adaptive follow-up, and experience signal.
+
 ## Scenario Team Can Provide Any Format
 
 Acceptable inputs include:
@@ -83,6 +87,8 @@ Before using a processed scenario in the demo, check:
 - Is the trap plausible but not unfair?
 - Can a strong candidate reasonably earn the key facts in 5 questions?
 - Is the next immediate step obvious only after earning context?
+- Do the questions create room for candidates to show prior experience, stakeholder awareness, risk awareness, or a useful hypothesis?
+- Can the manager's answers become useful input for a sharper follow-up question?
 
 ## Demo Workflow
 
