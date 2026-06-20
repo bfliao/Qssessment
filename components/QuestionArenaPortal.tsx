@@ -393,7 +393,6 @@ function taskTicketRows(scenario: ScenarioConfig) {
     ["Role", scenario.role || "Candidate"],
     ["Symptom", compactText(prompt, 150)],
     ["Scope", firstFocus || "Use questions to narrow the scope"],
-    ["On-call", "You"],
   ];
 }
 
