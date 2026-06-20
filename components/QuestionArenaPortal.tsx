@@ -725,7 +725,6 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
   );
   const greetingLines = useMemo(() => samGreetingLines(scenario), [scenario]);
   const ticketRows = useMemo(() => taskTicketRows(scenario), [scenario]);
-  const signals = useMemo(() => visibleSignals(scenario), [scenario]);
   const progressIndex =
     interviewPhase === "submitted"
       ? 3
@@ -1263,19 +1262,6 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
         </div>
       ) : (
         <div className="mx-auto mb-5 w-full max-w-[600px]">
-          <div className="mb-3 flex items-center gap-3 rounded-[28px] border border-white/75 bg-white/55 px-5 py-3 shadow-[0_10px_30px_rgba(38,38,54,.10),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
-            <div className="mr-auto text-[15px] font-bold tracking-[-0.02em] text-[#17171c]">
-              Question Arena{" "}
-              <span className="font-medium text-[#a6a6b0]">· work-sample</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDevMode(true)}
-              className="rounded-[9px] px-2 py-1 text-xs font-semibold text-[#6e6e78] transition hover:bg-white/45"
-            >
-              Dev mode
-            </button>
-          </div>
           <div className="grid grid-cols-4 gap-2 rounded-[28px] border border-white/75 bg-white/55 px-5 py-3 shadow-[0_10px_30px_rgba(38,38,54,.10),inset_0_1px_0_rgba(255,255,255,.85)] backdrop-blur-2xl">
             {["Brief", "Investigate", "Decide", "Done"].map((label, index) => (
               <div key={label}>
@@ -1616,25 +1602,18 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                       This is what's in front of you. Everything else, you'll
                       learn by asking {scenario.persona.name}.
                     </p>
-                    <div className="mt-5 flex flex-col gap-3">
-                      {signals.map((signal) => (
-                        <div
-                          key={signal.label}
-                          className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white/40 px-4 py-3"
-                        >
-                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] border border-white/75 bg-white/70">
-                            <ClipboardList className="h-4 w-4 text-[#3a3a42]" />
-                          </div>
-                          <div>
-                            <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#a6a6b0]">
-                              {signal.label}
-                            </p>
-                            <p className="mt-1 text-[13.5px] font-medium leading-6 text-[#3a3a42]">
-                              {signal.value}
-                            </p>
-                          </div>
+                    <div className="mt-5 rounded-2xl border border-black/10 bg-white/40 px-5 py-4">
+                      <div className="mb-3 flex items-center gap-3">
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] border border-white/75 bg-white/70">
+                          <ClipboardList className="h-4 w-4 text-[#3a3a42]" />
                         </div>
-                      ))}
+                        <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#a6a6b0]">
+                          Full visible prompt
+                        </p>
+                      </div>
+                      <p className="whitespace-pre-wrap text-[13.5px] font-medium leading-7 text-[#3a3a42]">
+                        {scenario.candidatePrompt}
+                      </p>
                     </div>
                     <button
                       type="button"
