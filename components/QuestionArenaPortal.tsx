@@ -67,6 +67,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
   const [modelStatus, setModelStatus] = useState(
     "Model endpoint not tested in UI."
   );
+  const [devMode, setDevMode] = useState(true);
   const [voiceMode, setVoiceMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -80,6 +81,9 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
     [scenario.hiddenFacts, unlockedFactIds]
   );
   const currentTemplateExists = scenarios.some((item) => item.id === templateId);
+  const layoutClassName = devMode
+    ? "grid grid-cols-[minmax(360px,0.9fr)_minmax(440px,1.2fr)_minmax(260px,0.7fr)] gap-4 max-[1180px]:grid-cols-1"
+    : "mx-auto grid w-full max-w-5xl grid-cols-1";
 
   function resetRun(nextScenario = scenario) {
     setMessages([]);
@@ -412,8 +416,37 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
   }
 
   return (
-    <div className="grid min-h-screen grid-cols-[minmax(360px,0.9fr)_minmax(440px,1.2fr)_minmax(260px,0.7fr)] gap-4 p-4 max-[1180px]:grid-cols-1">
-      <section className="rounded-lg border border-slate-800 bg-surface p-4">
+    <div className="min-h-screen p-4">
+      <div className="mb-3 flex justify-end">
+        <div className="flex items-center gap-3 rounded-full border border-slate-800 bg-surface px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
+          <span>Dev Mode</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={devMode}
+            aria-label={devMode ? "Disable dev mode" : "Enable dev mode"}
+            onClick={() => setDevMode((current) => !current)}
+            className={`relative h-6 w-11 rounded-full border transition-colors ${
+              devMode
+                ? "border-emerald-300 bg-emerald-300"
+                : "border-slate-700 bg-slate-900"
+            }`}
+          >
+            <span
+              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-slate-950 transition-transform ${
+                devMode ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+          <span className="min-w-6 text-slate-500">
+            {devMode ? "On" : "Off"}
+          </span>
+        </div>
+      </div>
+
+      <div className={layoutClassName}>
+        {devMode && (
+          <section className="rounded-lg border border-slate-800 bg-surface p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300">
@@ -573,6 +606,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
         </div>
         <p className="mt-3 text-xs text-slate-400">{status}</p>
       </section>
+        )}
 
       <section className="flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-lg border border-slate-800 bg-surface">
         <header className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
@@ -854,7 +888,8 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
         )}
       </section>
 
-      <aside className="rounded-lg border border-slate-800 bg-surface p-4">
+      {devMode && (
+        <aside className="rounded-lg border border-slate-800 bg-surface p-4">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300">
           Debug
         </p>
@@ -888,6 +923,8 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
           </pre>
         </section>
       </aside>
+      )}
+      </div>
     </div>
   );
 }
