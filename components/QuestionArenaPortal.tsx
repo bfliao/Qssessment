@@ -14,6 +14,7 @@ import type {
 
 interface QuestionArenaPortalProps {
   scenarios: ScenarioConfig[];
+  defaultProcessorPrompt: string;
   defaultAnswerPrompt: string;
   defaultEvaluatorPrompt: string;
 }
@@ -32,10 +33,20 @@ function parseScenario(value: string): ScenarioConfig {
 
 export default function QuestionArenaPortal({
   scenarios,
+  defaultProcessorPrompt,
   defaultAnswerPrompt,
   defaultEvaluatorPrompt,
 }: QuestionArenaPortalProps) {
   const [templateId, setTemplateId] = useState(scenarios[0]?.id ?? "");
+  const [targetRole, setTargetRole] = useState(
+    scenarios[0]?.role ?? "New Grad Software Engineer"
+  );
+  const [rawStoryline, setRawStoryline] = useState(
+    `Sam says: "Can you add a way for users to download their order history? Swamped today, thanks."
+
+This is for an NG SWE work-sample assessment. The scenario should test whether the candidate scopes before building and can ask who needs the feature, why it matters, what constraints exist, and what a minimal useful v1 should be.`
+  );
+  const [processorPrompt, setProcessorPrompt] = useState(defaultProcessorPrompt);
   const [scenarioText, setScenarioText] = useState(formatJson(scenarios[0]));
   const [answerPrompt, setAnswerPrompt] = useState(defaultAnswerPrompt);
   const [evaluatorPrompt, setEvaluatorPrompt] = useState(defaultEvaluatorPrompt);
@@ -50,6 +61,7 @@ export default function QuestionArenaPortal({
   const [status, setStatus] = useState("Ready.");
   const [report, setReport] = useState<ValidatorReport | null>(null);
   const [answerMode, setAnswerMode] = useState<"model" | "mock">("model");
+  const [processingScenario, setProcessingScenario] = useState(false);
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [loadingEvaluation, setLoadingEvaluation] = useState(false);
   const [modelStatus, setModelStatus] = useState(
@@ -62,6 +74,7 @@ export default function QuestionArenaPortal({
       scenario.hiddenFacts.filter((fact) => unlockedFactIds.includes(fact.id)),
     [scenario.hiddenFacts, unlockedFactIds]
   );
+  const currentTemplateExists = scenarios.some((item) => item.id === templateId);
 
   function resetRun(nextScenario = scenario) {
     setMessages([]);
@@ -76,6 +89,7 @@ export default function QuestionArenaPortal({
   function loadTemplate(id: string) {
     const next = scenarios.find((item) => item.id === id) ?? scenarios[0];
     setTemplateId(next.id);
+    setTargetRole(next.role);
     setScenarioText(formatJson(next));
     setScenario(next);
     resetRun(next);
@@ -86,10 +100,56 @@ export default function QuestionArenaPortal({
       const parsed = parseScenario(scenarioText);
       setScenario(parsed);
       setTemplateId(parsed.id);
+      setTargetRole(parsed.role);
       resetRun(parsed);
       setStatus("Scenario applied.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Invalid scenario JSON.");
+    }
+  }
+
+  async function processStoryline() {
+    const text = rawStoryline.trim();
+    if (!text || processingScenario) {
+      setStatus("Paste a raw storyline before processing.");
+      return;
+    }
+
+    setProcessingScenario(true);
+    setStatus("Processing storyline into ScenarioConfig...");
+
+    try {
+      const res = await fetch("/api/question-arena/process-scenario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rawStoryline: text,
+          targetRole,
+          processorPrompt,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = (await res.json()) as {
+        scenario: ScenarioConfig;
+        modelUsed: string;
+        source: "model" | "fallback";
+        warning?: string;
+      };
+      setScenario(data.scenario);
+      setScenarioText(formatJson(data.scenario));
+      setTemplateId(data.scenario.id);
+      setTargetRole(data.scenario.role);
+      resetRun(data.scenario);
+      setStatus(
+        data.warning ||
+          `Processed storyline with ${data.modelUsed} (${data.source}). Review JSON, then run Q&A.`
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : "Scenario processing failed."
+      );
+    } finally {
+      setProcessingScenario(false);
     }
   }
 
@@ -222,6 +282,9 @@ export default function QuestionArenaPortal({
   function exportRun() {
     const payload = {
       scenarioId: scenario.id,
+      rawStoryline,
+      targetRole,
+      processorPrompt,
       answerPrompt,
       evaluatorPrompt,
       unlockedFactIds,
@@ -257,6 +320,9 @@ export default function QuestionArenaPortal({
             onChange={(event) => loadTemplate(event.target.value)}
             className="mt-2 w-full rounded-md border border-slate-700 bg-background px-3 py-2 text-sm"
           >
+            {!currentTemplateExists && (
+              <option value={templateId}>{scenario.title} (generated)</option>
+            )}
             {scenarios.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.title}
@@ -265,12 +331,62 @@ export default function QuestionArenaPortal({
           </select>
         </label>
 
+        <div className="mb-4 rounded-lg border border-slate-800 bg-slate-950 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300">
+                Storyline Processor
+              </p>
+              <p className="text-xs text-slate-400">
+                Raw teammate scenario → manager persona + hidden-fact config.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={processStoryline}
+              disabled={processingScenario}
+              className="rounded-md bg-emerald-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-50"
+            >
+              {processingScenario ? "Processing..." : "Process"}
+            </button>
+          </div>
+
+          <label className="mb-3 block text-sm font-semibold text-slate-300">
+            Target Role
+            <input
+              value={targetRole}
+              onChange={(event) => setTargetRole(event.target.value)}
+              className="mt-2 w-full rounded-md border border-slate-700 bg-background px-3 py-2 text-sm outline-none focus:border-emerald-300"
+            />
+          </label>
+
+          <label className="mb-3 block text-sm font-semibold text-slate-300">
+            Raw Storyline Input
+            <textarea
+              value={rawStoryline}
+              onChange={(event) => setRawStoryline(event.target.value)}
+              className="mt-2 h-36 w-full resize-y rounded-md border border-slate-700 bg-background p-3 text-xs leading-relaxed outline-none focus:border-emerald-300"
+              spellCheck={false}
+            />
+          </label>
+
+          <label className="block text-sm font-semibold text-slate-300">
+            Scenario Processor Prompt
+            <textarea
+              value={processorPrompt}
+              onChange={(event) => setProcessorPrompt(event.target.value)}
+              className="mt-2 h-40 w-full resize-y rounded-md border border-slate-700 bg-background p-3 text-xs leading-relaxed outline-none focus:border-emerald-300"
+              spellCheck={false}
+            />
+          </label>
+        </div>
+
         <label className="mb-4 block text-sm font-semibold text-slate-300">
           Scenario Config JSON
           <textarea
             value={scenarioText}
             onChange={(event) => setScenarioText(event.target.value)}
-            className="mt-2 h-[330px] w-full resize-y rounded-md border border-slate-700 bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:border-emerald-300"
+            className="mt-2 h-[300px] w-full resize-y rounded-md border border-slate-700 bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:border-emerald-300"
             spellCheck={false}
           />
         </label>

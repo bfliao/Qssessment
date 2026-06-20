@@ -1,6 +1,6 @@
 # Question Arena
 
-Question Arena is an internal testing portal for building ambiguity-based candidate assessments. The current MVP lets the team edit a scenario config, edit the interview answer prompt, run a 5-question Q&A with a simulated manager, and inspect what hidden context the candidate earned.
+Question Arena is an internal testing portal for building ambiguity-based candidate assessments. The current MVP lets the team process a raw teammate storyline into a structured scenario config, edit the interview answer prompt, run a 5-question Q&A with a simulated manager, and inspect what hidden context the candidate earned.
 
 ## Tech Stack
 
@@ -43,6 +43,8 @@ OPENAI_BASE_URL=https://c5b6-136-24-140-216.ngrok-free.app/v1
 OPENAI_MODEL=qwen2.5-32b
 ```
 
+The current hackathon model endpoint is an OpenAI-compatible chat-completions endpoint. It does not fetch online by itself. If a scenario needs web context, add that context to the raw storyline first or build a server-side retrieval step that appends fetched evidence before calling the scenario processor.
+
 ## Project Structure
 
 ```txt
@@ -54,6 +56,7 @@ data/
   scenarios/                       # Scenario configs teammates can edit
   manager-personas/                # Reusable manager archetypes
 prompts/
+  scenario-processor.md            # Raw storyline -> ScenarioConfig prompt
   interview-answerer.md            # Manager/persona response prompt
   gatekeeper.md                    # Hidden-fact unlock prompt draft
   evaluator.md                     # Final validator/report prompt
@@ -72,10 +75,12 @@ assets/
 
 The current app uses a deterministic mock answerer:
 
-1. Candidate asks a question.
-2. The gatekeeper in `lib/questionArena/answerer.ts` decides what facts were earned.
-3. The manager persona answers using approved facts only.
-4. The report computes weighted information gain from unlocked hidden facts.
+1. Teammate writes a raw storyline in any reasonable format.
+2. `/api/question-arena/process-scenario` converts it into `ScenarioConfig` JSON using the scenario processor prompt and local manager archetypes.
+3. Candidate asks a question.
+4. The gatekeeper in `lib/questionArena/answerer.ts` decides what facts were earned.
+5. The manager persona answers using approved facts only.
+6. The report computes weighted information gain from unlocked hidden facts.
 
 When `Model endpoint` is selected, the same deterministic gatekeeper still decides what facts were earned. The model only writes the manager response using approved facts, so scoring stays stable while the answer sounds more natural.
 
@@ -84,6 +89,7 @@ The final report uses `/api/question-arena/evaluate`. It keeps weighted informat
 ## Team Workflow
 
 - Scenario owners edit or add JSON files in `data/scenarios/`.
+- Storyline owners can paste raw notes into the Storyline Processor, then review the generated ScenarioConfig before applying it.
 - Prompt owners edit files in `prompts/`.
 - UI/runtime owners work in `components/QuestionArenaPortal.tsx` and `lib/questionArena/`.
 - Keep scenario config, answerer prompt, and scoring logic separate so teammates do not overwrite each other.
@@ -91,6 +97,7 @@ The final report uses `/api/question-arena/evaluate`. It keeps weighted informat
 ## Current Scope
 
 - Editable scenario JSON
+- Raw storyline processor for manager persona + hidden-fact config generation
 - Editable interview answer prompt
 - 5-question Q&A runner
 - Debug panel for unlocked facts and gatekeeper decisions
