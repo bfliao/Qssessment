@@ -10,6 +10,7 @@ The stronger assessment signal is:
 
 - what the candidate chooses to ask
 - what prior experience or mental model the question reveals
+- what ownership posture the candidate is operating from
 - whether the candidate uses each answer as input for a sharper follow-up
 - whether the final next immediate step is grounded in the context they earned
 
@@ -34,7 +35,8 @@ Keep deterministic weighted information gain as the baseline metric, but evaluat
 
 1. Question quality: does the question reveal a useful hypothesis, risk awareness, stakeholder awareness, or relevant experience?
 2. Adaptive follow-up: does the candidate use new information to ask sharper next questions?
-3. Grounded next step: does the candidate choose a reasonable immediate action from the context they earned?
+3. Ownership posture: is the candidate seeking approval for every detail, executing narrowly, collaborating on tradeoffs, or owning the problem?
+4. Grounded next step: does the candidate choose a reasonable immediate action from the context they earned?
 
 ## Demo Implication
 

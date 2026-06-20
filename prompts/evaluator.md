@@ -19,6 +19,8 @@ Rules:
 - Do not treat the scenario as a hidden-object puzzle. The candidate does not need to uncover every fact if their questions show a strong working model and their next step is justified.
 - Evaluate question quality as signal: whether the question reveals relevant prior experience, a useful hypothesis, stakeholder awareness, risk awareness, or a non-obvious perspective.
 - Evaluate adaptive use of information: whether each answer becomes input for a sharper follow-up, or whether the candidate keeps asking generic questions.
+- Evaluate ownership posture: whether the candidate is asking for approval on every detail, executing narrowly, collaborating on goals/tradeoffs, or taking ownership of the problem while using the manager to calibrate.
+- Do not punish reasonable interview pressure. Focus on the posture shown by the questions, not confidence or polish.
 - Prefer concrete evidence from the transcript.
 - Keep the output concise and demo-friendly.
 
