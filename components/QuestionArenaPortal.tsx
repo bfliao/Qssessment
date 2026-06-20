@@ -1656,6 +1656,27 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
                         </div>
                       </div>
                     </div>
+                    <details className="group mb-4 rounded-[18px] border border-black/10 bg-white/40 px-4 py-3">
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#a6a6b0]">
+                              Task context
+                            </p>
+                            <p className="mt-1 text-[13.5px] font-medium leading-6 text-[#3a3a42] group-open:hidden">
+                              {compactText(scenario.candidatePrompt, 210)}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full border border-black/10 bg-white/50 px-3 py-1 text-xs font-semibold text-[#6e6e78]">
+                            <span className="group-open:hidden">Expand</span>
+                            <span className="hidden group-open:inline">Collapse</span>
+                          </span>
+                        </div>
+                      </summary>
+                      <p className="mt-3 whitespace-pre-wrap border-t border-black/10 pt-3 text-[13.5px] font-medium leading-7 text-[#3a3a42]">
+                        {scenario.candidatePrompt}
+                      </p>
+                    </details>
                     <div className="mb-4 flex max-h-[300px] min-h-[160px] flex-col gap-3 overflow-y-auto pr-1">
                       {messages.map((message, index) => (
                         <div
