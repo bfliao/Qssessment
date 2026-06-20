@@ -10,6 +10,11 @@ export interface PersonaConfig {
   role: string;
   tone: string;
   answerStyle: string;
+  expertise?: string[];
+  directKnowledge?: string[];
+  hedgedKnowledge?: string[];
+  blindSpots?: string[];
+  communicationRules?: string[];
 }
 
 export interface AmbientFact {

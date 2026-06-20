@@ -7,7 +7,35 @@
     "name": "Sam",
     "role": "Engineering Manager",
     "tone": "warm, concise, busy, not adversarial",
-    "answerStyle": "answers exactly what is asked; does not connect all dots; kind but not handholding"
+    "answerStyle": "answers exactly what is asked; does not connect all dots; kind but not handholding",
+    "expertise": [
+      "mobile product engineering",
+      "triaging customer-reported bugs",
+      "coordinating debugging across app and backend owners"
+    ],
+    "directKnowledge": [
+      "the symptom customers reported",
+      "which product surface is affected",
+      "recent release timeline",
+      "which team owns cart behavior"
+    ],
+    "hedgedKnowledge": [
+      "exact reproduction steps",
+      "whether the recent release is causal",
+      "guest-session persistence details",
+      "support ticket volume"
+    ],
+    "blindSpots": [
+      "low-level client storage implementation",
+      "server logs not yet inspected",
+      "exact impact on revenue"
+    ],
+    "communicationRules": [
+      "short answers",
+      "does not diagnose root cause unless asked toward it",
+      "hedges technical details outside direct ownership",
+      "does not recommend rollback without evidence"
+    ]
   },
   "maxQuestions": 5,
   "ambientFacts": [

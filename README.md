@@ -52,6 +52,7 @@ components/
   QuestionArenaPortal.tsx          # Scenario editor + Q&A runner
 data/
   scenarios/                       # Scenario configs teammates can edit
+  manager-personas/                # Reusable manager archetypes
 prompts/
   interview-answerer.md            # Manager/persona response prompt
   gatekeeper.md                    # Hidden-fact unlock prompt draft

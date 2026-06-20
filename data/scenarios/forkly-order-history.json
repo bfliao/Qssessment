@@ -7,7 +7,34 @@
     "name": "Sam",
     "role": "Engineering Manager",
     "tone": "warm, concise, busy, not adversarial",
-    "answerStyle": "answers exactly what is asked; does not connect all dots; kind but not handholding"
+    "answerStyle": "answers exactly what is asked; does not connect all dots; kind but not handholding",
+    "expertise": [
+      "product engineering execution",
+      "scoping ambiguous feature requests",
+      "balancing customer commitments with engineering scope"
+    ],
+    "directKnowledge": [
+      "which customer segment requested the feature",
+      "the business reason behind the request",
+      "the renewal deadline",
+      "what level of v1 scope is acceptable"
+    ],
+    "hedgedKnowledge": [
+      "exact number of accounts that need the feature",
+      "legal requirements for exported order data",
+      "the precise fields the accounting team will import"
+    ],
+    "blindSpots": [
+      "exact legal wording for PII handling",
+      "customer-success relationship details",
+      "long-term product roadmap for consumer data export"
+    ],
+    "communicationRules": [
+      "short answers",
+      "plainspoken",
+      "no proactive synthesis",
+      "natural uncertainty for legal or account-count details"
+    ]
   },
   "maxQuestions": 5,
   "ambientFacts": [
