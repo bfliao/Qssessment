@@ -342,7 +342,7 @@ function CandidateForm({
           disabled={!name.trim() || !email.trim() || (!initial && !selectedJob)}
           className="btn-primary"
         >
-          {initial ? "Save changes" : "Add candidate"}
+          {initial ? "Save changes" : "Save candidate"}
         </button>
       </div>
     </div>

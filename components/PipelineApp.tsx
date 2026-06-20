@@ -167,6 +167,10 @@ export default function PipelineApp({
     setScenarios([]);
     setSelectedScenarioIdx(0);
     setCritique(null);
+    if (useMock) {
+      setCrawling(false);
+      setCrawlError(null);
+    }
     if (!useMock) runCrawl(value);
   }
 
@@ -564,7 +568,7 @@ export default function PipelineApp({
 
         <button
           onClick={generateScenario}
-          disabled={loading !== null || crawling || (!useMock && !selected && !jd)}
+          disabled={loading !== null || (!useMock && (crawling || (!selected && !jd)))}
           className="btn-primary w-full"
         >
           {loading === "scenario" ? (

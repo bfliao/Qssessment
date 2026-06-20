@@ -1,0 +1,213 @@
+{
+  "exportedAt": "2026-06-20T21:51:12.424Z",
+  "scenario": {
+    "id": "scn_mqmvxt27_y87nw3",
+    "title": "Nvidia GeForce NOW software engineer intern",
+    "role": "Nvidia GeForce NOW software engineer intern",
+    "candidatePrompt": "You are on call for a service that uses Redis distributed locks to manage concurrency in Celery tasks. Users have reported that certain tasks are not running as expected, and logs indicate that tasks are frequently encountering 'LOCKED' messages. The service uses Redis version 4.0.9, Python 3.6.8, and Celery 5.1.1. The relevant code snippet is provided below:\n\n```python\n@shared_task(name='test_task', queue=\"test\")\ndef test(value):\n    lock_acquired = False\n    try:\n        lock = redis_cli.lock('test_lock', sleep=1)\n        lock_acquired = lock.acquire(blocking=False)\n        if lock_acquired:\n            print(f\"HELLO FROM: {value}\")\n            sleep(15)\n        else:\n            print(f\"LOCKED\")\n    except Exception as e:\n        print(str(e))\n    finally:\n        if lock_acquired:\n            lock.release()\n```\n\nObservations:\n- Task `test_task` is consistently reporting 'LOCKED'.\n- There are no exceptions logged.\n- The Redis server shows that the lock 'test_lock' is held for up to 20 minutes.\n- CPU usage on the Redis server is normal.\n- The application crashes approximately once every hour during the `sleep(15)` period.",
+    "todos": [
+      "Explain why the task `test_task` is frequently reporting 'LOCKED'.",
+      "Identify the potential issue causing the lock to remain held even after the application crashes.",
+      "Propose a solution to ensure that the lock is released even if the application crashes.",
+      "Describe how you would test your proposed solution by checking Redis lock expiration times and examining crash logs."
+    ],
+    "scope": {
+      "focus": [
+        "diagnostic reasoning",
+        "signal prioritization"
+      ],
+      "skip": [
+        "writing actual code",
+        "capacity planning"
+      ]
+    },
+    "maxQuestions": 5,
+    "persona": {
+      "name": "Sam",
+      "role": "Engineering Manager",
+      "tone": "kind, busy, concise, and factual",
+      "answerStyle": "Answer only the question asked. Give more useful context for specific, grounded questions. Do not proactively solve the incident for the candidate.",
+      "expertise": [
+        "distributed systems",
+        "debugging under ambiguity",
+        "incident response",
+        "Redis / caching"
+      ],
+      "directKnowledge": [
+        "source incident: Release redis lock if process die",
+        "Ana (Tech Lead): Someone who asks sharp clarifying questions before jumping to a fix, and reasons from evidence rather than hunches.",
+        "Bjorn (SRE): Calm under incidents, prioritizes the highest-signal hypotheses first, communicates status clearly."
+      ],
+      "hedgedKnowledge": [
+        "implementation details not shown in the assessment package",
+        "exact production internals outside the supplied scenario"
+      ],
+      "communicationRules": [
+        "Keep answers short.",
+        "Do not reveal all context at once.",
+        "If the candidate asks a broad question, answer broadly."
+      ]
+    }
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "role": "manager",
+      "content": "Go ahead — what would you like to know?"
+    },
+    {
+      "turn": 1,
+      "role": "candidate",
+      "content": "Sam, when we create redis_cli.lock('test_lock', sleep=1), is there any timeout/TTL configured for the lock, or is it using the default with no expiration? Also, after the app crashes during sleep(15), does the same Redis key remain until manual cleanup?"
+    },
+    {
+      "turn": 2,
+      "role": "manager",
+      "content": "The lock created with `redis_cli.lock('test_lock', sleep=1)` does not have an explicit timeout/TTL configured in the provided code snippet, so it will use the default behavior, which means the lock persists until manually released or the Redis server restarts. After the application crashes during `sleep(15)`, the lock 'test_lock' remains held until manually cleaned up."
+    },
+    {
+      "turn": 2,
+      "role": "candidate",
+      "content": "Sam, can we confirm whether every LOCKED log appears after a worker crash, and whether manually deleting test_lock immediately lets the next task run? This would verify that the crash leaves a stale Redis lock with no TTL, blocking all later tasks."
+    },
+    {
+      "turn": 3,
+      "role": "manager",
+      "content": "Yes, we can confirm whether every 'LOCKED' log appears after a worker crash and whether manually deleting the `test_lock` allows the next task to run. This would help verify if the crash leaves a stale Redis lock without a TTL, blocking subsequent tasks. Manually releasing the lock from the Redis CLI is an acceptable immediate mitigation step."
+    },
+    {
+      "turn": 3,
+      "role": "candidate",
+      "content": "Sam, what is causing the worker to crash during sleep(15)—is there a Celery time limit, memory limit, autoscaler restart, or container health check killing it? Also, can we check worker logs around the crash timestamp for SIGKILL, timeout, or OOM messages?"
+    },
+    {
+      "turn": 4,
+      "role": "manager",
+      "content": "The assessment is meant to probe debugging under ambiguity, incident response, Redis / caching. Your question covers multiple potential causes for the worker crashing; let's focus on the core issue of the lock not being released properly. Check the worker logs around the crash timestamp for any SIGKILL, timeout, or OOM messages to narrow down the cause."
+    },
+    {
+      "turn": 4,
+      "role": "candidate",
+      "content": "Sam, do the Redis keys for test_lock show no TTL, for example TTL test_lock returning -1, after the crash? Also, is this lock name shared by every test_task execution regardless of value?"
+    },
+    {
+      "turn": 5,
+      "role": "manager",
+      "content": "The Redis keys for `test_lock` do show no TTL, returning `-1` after the crash. Yes, the lock name `test_lock` is shared by every `test_task` execution regardless of the `value`."
+    },
+    {
+      "turn": 5,
+      "role": "candidate",
+      "content": "Sam, has the code been changed to set a lock timeout longer than the task duration, for example redis_cli.lock('test_lock', timeout=30, sleep=1)? If yes, do LOCKED messages stop clearing only after that TTL instead of persisting indefinitely?"
+    },
+    {
+      "turn": 6,
+      "role": "manager",
+      "content": "The code has not been changed to set a longer lock timeout. The lock is currently configured without an explicit timeout, leading to it persisting indefinitely if not explicitly released. Your hypothesis about the 'LOCKED' messages stopping after a TTL adjustment is correct; setting a shorter TTL could help mitigate this issue."
+    }
+  ],
+  "unlockedFactIds": [
+    "crit_lmoj6wv7",
+    "crit_z8dr79lk",
+    "crit_xa76ku1z",
+    "crit_mq29hvm1",
+    "crit_rghhgprl"
+  ],
+  "hiddenFacts": [
+    {
+      "id": "crit_mq29hvm1",
+      "title": "signal_reading, debugging",
+      "fact": "Candidate demonstrates understanding of why the task `test_task` is frequently reporting 'LOCKED'. Acceptable approaches include: identifying the non-blocking nature of `lock.acquire(blocking=False)`, recognizing that other tasks may hold the lock, or suggesting that the lock is not being released properly.",
+      "unlocked": true
+    },
+    {
+      "id": "crit_lmoj6wv7",
+      "title": "hypothesis_formation, debugging",
+      "fact": "Candidate forms hypotheses about why the lock remains held even after the application crashes. Acceptable approaches include: identifying that the lock is not being released due to an unhandled exception or improper cleanup, suggesting that the lock's TTL might be too long, or proposing that the lock mechanism itself is flawed.",
+      "unlocked": true
+    },
+    {
+      "id": "crit_pygxuc95",
+      "title": "red_herring_handling, debugging",
+      "fact": "Candidate actively dismisses irrelevant signals such as normal CPU usage on the Redis server or the absence of exceptions in the logs. They should focus on the core issue of the lock not being released.",
+      "unlocked": false
+    },
+    {
+      "id": "crit_z8dr79lk",
+      "title": "root_cause_identification, debugging",
+      "fact": "Candidate identifies the root cause of the issue. Acceptable approaches include: pinpointing the lack of proper lock release upon application crash, suggesting the need for a shorter lock TTL, or identifying the non-blocking acquisition as a contributing factor.",
+      "unlocked": true
+    },
+    {
+      "id": "crit_xa76ku1z",
+      "title": "immediate_mitigation, incident_response",
+      "fact": "Candidate proposes immediate steps to mitigate the issue. Acceptable approaches include: manually releasing the lock from the Redis CLI, increasing logging to track lock acquisition and release, or temporarily disabling the locking mechanism to allow tasks to run.",
+      "unlocked": true
+    },
+    {
+      "id": "crit_rghhgprl",
+      "title": "proper_fix, distributed_systems",
+      "fact": "Candidate suggests a proper fix to ensure the lock is released even if the application crashes. Acceptable approaches include: using a context manager to automatically release the lock, implementing a heartbeat mechanism to renew the lock, or setting a shorter TTL for the lock.",
+      "unlocked": true
+    },
+    {
+      "id": "crit_ne3c7v65",
+      "title": "prevention_process, debugging",
+      "fact": "Candidate describes how to prevent this issue from recurring. Acceptable approaches include: adding automated tests to check lock behavior, implementing monitoring to alert on long-held locks, or enhancing the code to handle exceptions more gracefully.",
+      "unlocked": false
+    },
+    {
+      "id": "crit_xf2vvsnk",
+      "title": "communication, debugging",
+      "fact": "Candidate explains their findings and proposed solutions to a non-technical stakeholder. Acceptable approaches include: using analogies to explain the concept of distributed locks, summarizing the key issues without technical jargon, or focusing on the impact and resolution rather than the technical details.",
+      "unlocked": false
+    }
+  ],
+  "finalRecommendation": "",
+  "report": {
+    "percent": 70,
+    "label": "Developing ambiguity reducer",
+    "summary": "The candidate demonstrates a developing ability to reduce ambiguity by asking targeted questions and forming useful hypotheses, but the next immediate step is missing and the candidate could better address red herrings and prevention processes.",
+    "signalBreakdown": {
+      "questionQuality": {
+        "label": "Reveals useful hypotheses",
+        "assessment": "The candidate asks questions that reveal useful hypotheses about the lock mechanism and the impact of the application crashes.",
+        "evidence": "Candidate asks about the lock's TTL, whether the lock remains after a crash, and the cause of the worker crash."
+      },
+      "adaptiveFollowUp": {
+        "label": "Uses answers for sharper follow-ups",
+        "assessment": "The candidate adapts their questions based on previous answers, refining their understanding of the issue.",
+        "evidence": "After learning that the lock persists indefinitely, the candidate asks about the TTL and the shared lock name."
+      },
+      "ownershipPosture": {
+        "label": "Collaborator",
+        "assessment": "The candidate collaborates with the manager to understand the issue and propose solutions, showing a collaborative approach.",
+        "evidence": "Candidate seeks confirmation and validation from the manager throughout the conversation."
+      },
+      "groundedNextStep": {
+        "label": "Missing",
+        "assessment": "The candidate does not provide a grounded next immediate step, leaving the recommendation incomplete.",
+        "evidence": "Final recommendation is not provided."
+      }
+    },
+    "strengths": [
+      "Asks targeted questions to form useful hypotheses",
+      "Adapts questions based on previous answers"
+    ],
+    "concerns": [
+      "Does not provide a grounded next immediate step",
+      "Could better address red herrings and prevention processes"
+    ],
+    "evidence": [
+      "Candidate asks about the lock's TTL and whether the lock remains after a crash.",
+      "Candidate seeks confirmation and validation from the manager."
+    ],
+    "finalRecommendationAssessment": "The candidate does not provide a grounded next immediate step, which leaves the recommendation incomplete.",
+    "nextInterviewFocus": [
+      "Probing for a grounded next immediate step",
+      "Handling red herrings and discussing prevention processes"
+    ],
+    "modelUsed": "qwen2.5-32b",
+    "source": "model"
+  }
+}
