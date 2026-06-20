@@ -27,6 +27,7 @@ export const MOCK_INPUT: PipelineInput = {
 
 export const MOCK_SCENARIO: Scenario = {
   id: "scn_mock_demo",
+  difficulty: "mid",
   brief:
     "It's 2pm on a Tuesday. Alerts fire: p99 latency on the product API has tripled in the last 20 minutes, and customers are complaining the site feels slow. CPU and disk on the app servers look normal. Cache hit rate dropped from 95% to 12% around the same time. A deploy went out this morning. You're on call. Walk us through how you'd diagnose and respond.",
   focusAreas: [
