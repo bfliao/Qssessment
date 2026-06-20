@@ -1,6 +1,6 @@
 # Question Arena
 
-Question Arena is an internal testing portal for building ambiguity-based candidate assessments. The current MVP lets the team process a raw teammate storyline into a structured scenario config, edit the interview answer prompt, run a 5-question Q&A with a simulated HR/team/manager source, and inspect what hidden context the candidate earned.
+Question Arena is an internal testing portal for building ambiguity-based candidate assessments. The current MVP lets the team process a raw teammate storyline into a structured scenario config, edit the interview answer prompt, run a 5-question Q&A with a simulated HR/team/manager source, ask the candidate for a next immediate step, and inspect what hidden context the candidate earned.
 
 ## Tech Stack
 
@@ -82,7 +82,8 @@ The current app uses a deterministic mock answerer:
 3. Candidate asks a question.
 4. The gatekeeper in `lib/questionArena/answerer.ts` decides what facts were earned.
 5. The manager persona answers using approved facts only.
-6. The report computes weighted information gain from unlocked hidden facts.
+6. The candidate proposes a next immediate step, not a complete final solution.
+7. The report computes weighted information gain from unlocked hidden facts.
 
 When `Model endpoint` is selected, the same deterministic gatekeeper still decides what facts were earned. The model only writes the manager response using approved facts, so scoring stays stable while the answer sounds more natural.
 

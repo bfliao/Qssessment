@@ -40,8 +40,8 @@ function fallbackAssessment(
       deterministic.percent >= 75
         ? "The candidate uncovered most of the decision-critical context before recommending a direction."
         : deterministic.percent >= 45
-          ? "The candidate found some useful context but missed important constraints that would affect the recommendation."
-          : "The candidate did not earn enough context to make a grounded recommendation.",
+          ? "The candidate found some useful context but missed important constraints that would affect the next step."
+          : "The candidate did not earn enough context to choose a grounded next step.",
     strengths:
       unlockedFacts.length > 0
         ? unlockedFacts.slice(0, 3).map((fact) => `Uncovered: ${fact.title}.`)
@@ -57,8 +57,8 @@ function fallbackAssessment(
         ? askedQuestions.slice(0, 3).map((question) => `Asked: ${question}`)
         : ["No candidate questions were recorded."],
     finalRecommendationAssessment: finalRecommendation
-      ? "Review the final recommendation against the earned context and missed facts shown above."
-      : "No final recommendation was submitted.",
+      ? "Review the next immediate step against the earned context and missed facts shown above."
+      : "No next immediate step was submitted.",
     nextInterviewFocus:
       deterministic.missedFacts.length > 0
         ? deterministic.missedFacts
@@ -84,7 +84,7 @@ function normalizeAssessment(value: Partial<ValidatorAssessment>) {
     evidence: Array.isArray(value.evidence) ? value.evidence : [],
     finalRecommendationAssessment:
       value.finalRecommendationAssessment ||
-      "No final recommendation assessment provided.",
+      "No next-step assessment provided.",
     nextInterviewFocus: Array.isArray(value.nextInterviewFocus)
       ? value.nextInterviewFocus
       : [],

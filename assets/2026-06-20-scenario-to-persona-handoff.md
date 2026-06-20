@@ -52,7 +52,7 @@ The processor generates these scenario-specific fields:
 - ambient facts that make the world feel real but do not score
 - hidden decision-critical facts that determine information gain
 - trap assumptions that a rushed candidate might make
-- ideal recommendation
+- ideal next step / recommendation
 
 ## Scenario Team Can Provide Any Format
 
@@ -77,12 +77,12 @@ Before using a processed scenario in the demo, check:
 
 - Does the chosen persona naturally know the facts they reveal?
 - Are any facts better marked as hedged instead of direct?
-- Does every hidden fact change the final recommendation?
+- Does every hidden fact change the next immediate step or recommendation?
 - Are ambient facts truly non-scoring?
 - Is the candidate prompt vague but fair?
 - Is the trap plausible but not unfair?
 - Can a strong candidate reasonably earn the key facts in 5 questions?
-- Is the final recommendation obvious only after earning context?
+- Is the next immediate step obvious only after earning context?
 
 ## Demo Workflow
 

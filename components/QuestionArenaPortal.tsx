@@ -540,13 +540,13 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
 
         <div className="border-t border-slate-800 bg-background p-4">
           <label className="mb-2 block text-sm font-semibold text-slate-300">
-            Final Recommendation
+            Next Immediate Step
           </label>
           <textarea
             value={finalRecommendation}
             onChange={(event) => setFinalRecommendation(event.target.value)}
             className="h-24 w-full resize-y rounded-md border border-slate-700 bg-surface p-3 text-sm outline-none focus:border-emerald-300"
-            placeholder="Write your diagnosis and recommendation..."
+            placeholder="Based on what you learned, what would you do next?"
           />
           <button
             onClick={generateReport}
@@ -603,7 +603,7 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
               ))}
             </ul>
             <h4 className="mb-1 text-xs font-black uppercase tracking-wide text-slate-500">
-              Final Recommendation
+              Next Immediate Step
             </h4>
             <p className="mb-4 text-sm leading-relaxed text-slate-300">
               {report.assessment.finalRecommendationAssessment}
