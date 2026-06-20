@@ -1,18 +1,18 @@
-import Chat from "@/components/Chat";
+import PipelineApp from "@/components/PipelineApp";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-6">
-      <header className="mb-4">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6">
+      <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Interviewer Agent
+          Scenario → Critique → Rubric
         </h1>
         <p className="text-sm text-slate-400">
-          Practice interviews with an AI interviewer. Pick a role and start
-          answering.
+          Turn a JD, skillset, and team input into an evaluation scenario and a
+          recursive scoring rubric.
         </p>
       </header>
-      <Chat />
+      <PipelineApp />
     </main>
   );
 }

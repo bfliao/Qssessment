@@ -12,3 +12,15 @@ body {
   color: hsl(210 40% 96%);
   -webkit-font-smoothing: antialiased;
 }
+
+@layer components {
+  .input {
+    @apply w-full rounded-md border border-slate-700 bg-background px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-slate-950 transition-opacity hover:opacity-90 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1 rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800;
+  }
+}

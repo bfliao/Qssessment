@@ -1,0 +1,50 @@
+// Shared types for the scenario -> critique -> rubric pipeline.
+
+export interface DesiredCoworker {
+  memberId: string;
+  memberName?: string;
+  /** This member's description of their ideal coworker. */
+  description: string;
+}
+
+export interface PipelineInput {
+  jd: string;
+  skillset: string[];
+  /** Each team member submits their own desired coworker. */
+  teamInput: DesiredCoworker[];
+}
+
+export interface Scenario {
+  id: string;
+  /** The ambiguous work scenario presented to the candidate. */
+  brief: string;
+  /** What the scenario is designed to probe (high-level). */
+  focusAreas: string[];
+  /** Echo of the inputs this scenario was derived from. */
+  derivedFrom: PipelineInput;
+  createdAt: string;
+}
+
+/** Max nesting depth for Criterion.followups (decision B). */
+export const MAX_FOLLOWUP_DEPTH = 7;
+
+/**
+ * A node in the recursive scoring-rubric tree produced by the critique agent.
+ * Sibling `score` values sum to 1 at every level (decision C).
+ */
+export interface Criterion {
+  id: string;
+  /** Observable evidence describing what "meeting this criterion" looks like. */
+  evidence: string;
+  /** Hashtags derived from the evidence (decision D). */
+  tags: string[];
+  /** 0-1; siblings under the same parent sum to 1. */
+  score: number;
+  /** Nested sub-criteria, max depth MAX_FOLLOWUP_DEPTH. */
+  followups: Criterion[];
+}
+
+export interface CritiqueOutput {
+  scenarioId: string;
+  criteria: Criterion[];
+}
