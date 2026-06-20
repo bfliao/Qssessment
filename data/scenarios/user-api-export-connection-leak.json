@@ -1,0 +1,158 @@
+{
+  "id": "user_api_export_connection_leak",
+  "title": "User API Export Connection Leak",
+  "role": "Backend / Software Engineer — Junior",
+  "candidatePrompt": "It's Thursday at 2:15pm. A Slack alert fires: `user-api` error rate is at 11% and climbing. Your team's service handles user profile reads and writes for about 8,000 requests/minute. A new feature — \"Export my data as CSV\" — was deployed this morning at 9:40am. No other changes went out today. Signals: error rate 0% to 11%, p99 latency 85ms to 1,900ms, repeated `ER_CON_COUNT_ERROR: Too many connections`, MySQL pool 98/100 connections in use, service memory 280MB to 510MB and growing about 5MB/min since 10:30am, CPU normal at 18%, and `/export` gets about 40–60 requests/hour. You have 5 questions before stating your next immediate step.",
+  "persona": {
+    "name": "Sam",
+    "role": "Engineering Manager",
+    "tone": "calm, concise, incident-focused, not adversarial",
+    "answerStyle": "answers exactly what is asked; confirms operational facts and code observations; does not volunteer the root cause unless the candidate asks toward connection lifecycle",
+    "expertise": [
+      "backend incident triage",
+      "database connection lifecycle",
+      "production mitigation",
+      "junior engineer debugging assessment"
+    ],
+    "directKnowledge": [
+      "the alert timeline and production metrics",
+      "the new export endpoint deployment",
+      "the code shape of the export handler",
+      "which mitigations are available right now"
+    ],
+    "hedgedKnowledge": [
+      "exact number of leaked connections per request",
+      "whether all error branches leak or only one branch",
+      "the long-term product requirement for CSV export"
+    ],
+    "blindSpots": [
+      "precise customer impact by account",
+      "full database infrastructure ownership",
+      "CSV formatting requirements"
+    ],
+    "communicationRules": [
+      "short answers",
+      "plainspoken",
+      "do not solve the incident proactively",
+      "push back gently on database tuning as the main fix"
+    ]
+  },
+  "maxQuestions": 5,
+  "ambientFacts": [
+    {
+      "id": "traffic_baseline",
+      "fact": "`user-api` normally handles about 8,000 requests/minute with p99 latency around 85ms.",
+      "whenToReveal": ["baseline", "normal", "traffic", "volume", "latency"]
+    },
+    {
+      "id": "deploy_timeline",
+      "fact": "The CSV export feature deployed at 9:40am; the error rate and memory growth started around 10:30am.",
+      "whenToReveal": ["timeline", "deploy", "change", "when", "started"]
+    },
+    {
+      "id": "low_export_volume",
+      "fact": "`/export` only receives about 40–60 requests per hour, but each request can still leak a database connection if it is not released.",
+      "whenToReveal": ["export", "volume", "per hour", "few requests", "low traffic"]
+    },
+    {
+      "id": "cpu_not_bottleneck",
+      "fact": "CPU is normal at about 18%, so this does not look like CPU saturation.",
+      "whenToReveal": ["cpu", "bottleneck", "saturation", "performance"]
+    }
+  ],
+  "hiddenFacts": [
+    {
+      "id": "connection_leak_accumulates",
+      "title": "Few requests can exhaust the pool",
+      "fact": "A low-volume endpoint can exhaust MySQL connections if each request opens a connection and some path never releases it; leaks accumulate over time.",
+      "category": "resource_lifecycle",
+      "weight": 1.4,
+      "knowledgeLevel": "direct",
+      "unlockTriggers": ["few requests", "low volume", "how can", "cause", "connections", "pool", "accumulate", "leak", "per hour"],
+      "requiresSpecificity": true,
+      "sampleResponse": "Yes. Even 50 requests per hour can drain a 100-connection pool if some requests open a connection and never release it. The leak accumulates instead of ending with the request.",
+      "whyItMatters": "Tests whether the candidate reads the connection error literally and reasons about open/use/close over time."
+    },
+    {
+      "id": "timeline_points_to_export",
+      "title": "Timeline points to export",
+      "fact": "The 9:40am export deploy followed by failures starting around 10:30am makes the new endpoint the strongest suspect despite low request volume.",
+      "category": "evidence",
+      "weight": 1.0,
+      "knowledgeLevel": "direct",
+      "unlockTriggers": ["timeline", "deploy", "new feature", "what changed", "since", "10:30", "9:40", "suspect"],
+      "requiresSpecificity": true,
+      "sampleResponse": "The export deploy is the only change today, and the connection pool plus memory growth started after it. Low volume makes it less obvious, but it is still the strongest suspect.",
+      "whyItMatters": "Connects production symptoms to the only relevant code change without over-indexing on request volume."
+    },
+    {
+      "id": "missing_release_on_error_path",
+      "title": "Missing release on error path",
+      "fact": "The likely bug is a database connection opened at the top of the `/export` handler and not released in a `finally` block or equivalent cleanup path when an error or early return happens.",
+      "category": "root_cause",
+      "weight": 1.8,
+      "knowledgeLevel": "direct",
+      "unlockTriggers": ["code", "handler", "look for", "confirm", "finally", "release", "close", "error path", "early return", "catch", "bug"],
+      "requiresSpecificity": true,
+      "sampleResponse": "I would look for whether `connection.release()` or `connection.close()` is guaranteed in a `finally`. The bug looks like opening a connection, then returning or throwing before cleanup runs.",
+      "whyItMatters": "This is the central diagnosis: resource lifecycle is broken on an error path."
+    },
+    {
+      "id": "memory_growth_supports_leak",
+      "title": "Memory growth supports leak",
+      "fact": "Memory growing steadily while CPU stays normal supports a leak or accumulation problem rather than a CPU-bound performance issue.",
+      "category": "evidence",
+      "weight": 0.9,
+      "knowledgeLevel": "hedged",
+      "unlockTriggers": ["memory", "growing", "cpu", "normal", "leak", "latency", "evidence"],
+      "requiresSpecificity": true,
+      "sampleResponse": "The memory line supports an accumulation issue. CPU is normal, so I would not start with CPU optimization.",
+      "whyItMatters": "Helps the candidate prioritize resource exhaustion over generic performance work."
+    },
+    {
+      "id": "disable_export_first",
+      "title": "Disable export to stop bleeding",
+      "fact": "The best immediate mitigation is to stop new `/export` traffic with a feature flag, route block, or rollback of that feature, then restart or drain instances if needed to clear leaked connections.",
+      "category": "mitigation",
+      "weight": 1.5,
+      "knowledgeLevel": "direct",
+      "unlockTriggers": ["mitigation", "stop bleeding", "right now", "disable", "feature flag", "rollback", "route block", "restart", "stabilize"],
+      "requiresSpecificity": true,
+      "sampleResponse": "I would disable or block `/export` first so it stops leaking, then recycle affected instances if needed. Raising max connections might buy time but does not stop the leak.",
+      "whyItMatters": "Separates immediate production mitigation from the proper code fix."
+    },
+    {
+      "id": "prevention_error_path_tests",
+      "title": "Catch cleanup bugs before shipping",
+      "fact": "Prevention should include tests for success and error paths, a shared `withConnection` helper or `try/finally` pattern, code review checks for resource cleanup, and metrics/alerts for pool usage.",
+      "category": "prevention",
+      "weight": 1.2,
+      "knowledgeLevel": "direct",
+      "unlockTriggers": ["prevent", "next time", "test", "error path", "tooling", "process", "lint", "helper", "metrics", "alert", "before it ships"],
+      "requiresSpecificity": true,
+      "sampleResponse": "I would add an error-path test that proves the connection is released, prefer a shared helper that always releases in `finally`, and alert on pool usage before it hits the limit.",
+      "whyItMatters": "Tests whether the candidate can convert the incident into practical engineering safeguards."
+    }
+  ],
+  "trapAssumptions": [
+    {
+      "id": "tune_max_connections",
+      "assumption": "The candidate treats MySQL `max_connections` tuning as the main fix.",
+      "whyTempting": "The error says too many connections, so increasing the limit sounds directly related.",
+      "howToDisprove": "Ask what changed, whether connections are released, and why memory grows while CPU stays normal."
+    },
+    {
+      "id": "ignore_low_volume_export",
+      "assumption": "The candidate dismisses `/export` because it only receives about 50 requests per hour.",
+      "whyTempting": "Low request volume makes the new endpoint look too small to affect an 8,000 rpm service.",
+      "howToDisprove": "Reason about leaked connections accumulating across requests instead of being released."
+    },
+    {
+      "id": "optimize_csv_formatting",
+      "assumption": "The candidate focuses on CSV formatting, load testing, or CPU optimization instead of connection lifecycle.",
+      "whyTempting": "The new feature is an export feature and latency is high, so generic performance work can feel relevant.",
+      "howToDisprove": "Follow the literal error: `ER_CON_COUNT_ERROR`, pool 98/100, normal CPU, and steadily growing memory."
+    }
+  ],
+  "idealRecommendation": "The likely issue is a connection leak in the new `/export` handler: a connection is opened but not reliably released on an error or early-return path. First disable or block `/export` and recycle affected instances if needed to stabilize `user-api`. Then fix the handler by guaranteeing cleanup with `finally` or a shared connection helper, add tests for success and error paths, and add pool usage alerts/code review checks so resource cleanup bugs are caught before shipping."
+}
