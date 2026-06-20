@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: hsl(222 47% 6%);
+  color: hsl(210 40% 96%);
+  -webkit-font-smoothing: antialiased;
+}
