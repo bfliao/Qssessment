@@ -1,18 +1,20 @@
-import Chat from "@/components/Chat";
+import { readFileSync } from "fs";
+import path from "path";
+import QuestionArenaPortal from "@/components/QuestionArenaPortal";
+import { scenarioTemplates } from "@/lib/questionArena/scenarios";
 
 export default function Home() {
+  const defaultAnswerPrompt = readFileSync(
+    path.join(process.cwd(), "prompts", "interview-answerer.md"),
+    "utf8"
+  );
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-6">
-      <header className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Interviewer Agent
-        </h1>
-        <p className="text-sm text-slate-400">
-          Practice interviews with an AI interviewer. Pick a role and start
-          answering.
-        </p>
-      </header>
-      <Chat />
+    <main>
+      <QuestionArenaPortal
+        scenarios={scenarioTemplates}
+        defaultAnswerPrompt={defaultAnswerPrompt}
+      />
     </main>
   );
 }

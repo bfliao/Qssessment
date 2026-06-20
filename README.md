@@ -1,14 +1,12 @@
-# Interviewer Agent
+# Question Arena
 
-An AI-powered mock interviewer built with **Next.js 14**, **TypeScript**, **TailwindCSS**, and the **OpenAI API**. Pick a role and practice interviews with an agent that asks questions, adapts difficulty, and gives feedback.
+Question Arena is an internal testing portal for building ambiguity-based candidate assessments. The current MVP lets the team edit a scenario config, edit the interview answer prompt, run a 5-question Q&A with a simulated manager, and inspect what hidden context the candidate earned.
 
 ## Tech Stack
 
 - Next.js 14 (App Router)
 - React 18 + TypeScript
 - TailwindCSS
-- OpenAI Chat Completions API
-- lucide-react icons
 
 ## Getting Started
 
@@ -18,47 +16,63 @@ An AI-powered mock interviewer built with **Next.js 14**, **TypeScript**, **Tail
    npm install
    ```
 
-2. Set up your environment variables:
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-   Then add your `OPENAI_API_KEY` to `.env.local`.
-
-3. Run the dev server:
+2. Run the dev server:
 
    ```bash
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000).
+3. Open [http://localhost:3000](http://localhost:3000).
+
+No API key is required for the current mock portal.
 
 ## Project Structure
 
-```
+```txt
 app/
-  api/chat/route.ts   # OpenAI interviewer endpoint
-  layout.tsx          # Root layout
-  page.tsx            # Home page
-  globals.css         # Tailwind styles
+  page.tsx                         # Testing portal page
 components/
-  Chat.tsx            # Chat UI + role selector
+  QuestionArenaPortal.tsx          # Scenario editor + Q&A runner
+data/
+  scenarios/                       # Scenario configs teammates can edit
+prompts/
+  interview-answerer.md            # Manager/persona response prompt
+  gatekeeper.md                    # Hidden-fact unlock prompt draft
+lib/
+  questionArena/
+    answerer.ts                    # Deterministic mock gatekeeper/persona
+    scenarios.ts                   # Scenario registry
+    types.ts                       # Scenario and scoring types
+testing-portal/
+  index.html                       # Static fallback prototype
+assets/
+  *.md                             # Product specs, decision logs, research notes
 ```
 
 ## How It Works
 
-The frontend in `components/Chat.tsx` sends the conversation and selected role
-to `POST /api/chat`. The route injects an interviewer system prompt and calls
-the OpenAI Chat Completions API, returning the assistant's reply.
+The current app uses a deterministic mock answerer:
 
-## Deploy
+1. Candidate asks a question.
+2. The gatekeeper in `lib/questionArena/answerer.ts` decides what facts were earned.
+3. The manager persona answers using approved facts only.
+4. The report computes weighted information gain from unlocked hidden facts.
 
-Deploy to Vercel, set the `OPENAI_API_KEY` environment variable, and you're live.
+The prompt files define the intended model-backed behavior for the next integration step.
 
-## Next Ideas (for the hackathon)
+## Team Workflow
 
-- Stream responses for a typing effect
-- Add resume upload to tailor questions
-- Score answers and produce an end-of-interview report
-- Voice input/output for realistic mock interviews
+- Scenario owners edit or add JSON files in `data/scenarios/`.
+- Prompt owners edit files in `prompts/`.
+- UI/runtime owners work in `components/QuestionArenaPortal.tsx` and `lib/questionArena/`.
+- Keep scenario config, answerer prompt, and scoring logic separate so teammates do not overwrite each other.
+
+## Current Scope
+
+- Editable scenario JSON
+- Editable interview answer prompt
+- 5-question Q&A runner
+- Debug panel for unlocked facts and gatekeeper decisions
+- Weighted information-gain report
+
+The original mock interviewer chat files are still in the repository, but the default home page now opens Question Arena.

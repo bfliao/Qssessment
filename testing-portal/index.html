@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Question Arena Testing Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="editor-panel" aria-label="Scenario setup">
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">Testing Portal</p>
+            <h1>Question Arena</h1>
+          </div>
+          <button id="applyConfig" class="primary-button">Apply</button>
+        </header>
+
+        <label class="field">
+          <span>Scenario Template</span>
+          <select id="scenarioTemplate">
+            <option value="scoping">NG SWE Scoping Ticket</option>
+            <option value="debugging">NG SWE Debugging Bug</option>
+          </select>
+        </label>
+
+        <label class="field large">
+          <span>Scenario Config JSON</span>
+          <textarea id="scenarioInput" spellcheck="false"></textarea>
+        </label>
+
+        <label class="field prompt">
+          <span>Interview Answer Prompt</span>
+          <textarea id="answerPrompt" spellcheck="false"></textarea>
+        </label>
+
+        <div class="button-row">
+          <button id="loadTemplate" class="secondary-button">Load Template</button>
+          <button id="resetRun" class="secondary-button">Reset Run</button>
+          <button id="exportTranscript" class="secondary-button">Export Transcript</button>
+        </div>
+
+        <div id="configStatus" class="status-line">Ready.</div>
+      </section>
+
+      <section class="run-panel" aria-label="Candidate interview runner">
+        <header class="run-header">
+          <div>
+            <p class="eyebrow">Candidate View</p>
+            <h2 id="scenarioTitle">Scenario</h2>
+          </div>
+          <div class="counter">
+            <span id="questionsLeft">5</span>
+            <small>questions left</small>
+          </div>
+        </header>
+
+        <section class="scenario-card">
+          <h3>Problem Statement</h3>
+          <p id="candidatePrompt"></p>
+        </section>
+
+        <section id="chatLog" class="chat-log" aria-live="polite"></section>
+
+        <form id="questionForm" class="question-form">
+          <label for="questionInput">Ask the manager</label>
+          <div class="input-row">
+            <input
+              id="questionInput"
+              type="text"
+              autocomplete="off"
+              placeholder="Ask one focused question..."
+            />
+            <button class="primary-button" type="submit">Ask</button>
+          </div>
+        </form>
+
+        <section class="recommendation">
+          <label for="finalRecommendation">Final Recommendation</label>
+          <textarea
+            id="finalRecommendation"
+            placeholder="Write your diagnosis and recommendation after the questions..."
+          ></textarea>
+          <button id="scoreRun" class="primary-button">Generate Report</button>
+        </section>
+
+        <section id="report" class="report" hidden></section>
+      </section>
+
+      <aside class="debug-panel" aria-label="Debug and scoring">
+        <header>
+          <p class="eyebrow">Debug</p>
+          <h2>Answerer State</h2>
+        </header>
+
+        <section>
+          <h3>Unlocked Facts</h3>
+          <ul id="unlockedFacts" class="fact-list"></ul>
+        </section>
+
+        <section>
+          <h3>Last Gatekeeper Decision</h3>
+          <pre id="lastDecision">{}</pre>
+        </section>
+      </aside>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
