@@ -48,6 +48,8 @@ export interface ScenarioConfig {
   title: string;
   role: string;
   candidatePrompt: string;
+  todos?: string[];
+  scope?: { focus?: string[]; skip?: string[] };
   persona: PersonaConfig;
   maxQuestions: number;
   ambientFacts: AmbientFact[];

@@ -45,6 +45,8 @@ interface StoredAssessmentScenario {
   id: string;
   jobTitle?: string;
   candidatePrompt?: string;
+  todos?: string[];
+  scope?: { focus?: string[]; skip?: string[] };
   focusAreas?: string[];
   sourceTitle?: string;
   sourceUrl?: string;
@@ -153,6 +155,8 @@ function scenarioConfigFromAssessment(
     title: item.jobTitle || stored.jobTitle || "Assessment",
     role,
     candidatePrompt,
+    todos: item.todos,
+    scope: item.scope,
     persona: {
       name: "Sam",
       role: "Engineering Manager",
@@ -991,13 +995,72 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-slate-700/80 bg-background p-4">
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                  Brief
-                </p>
-                <p className="text-sm leading-7 text-slate-100">
-                  {scenario.candidatePrompt}
-                </p>
+              <div className="space-y-3 p-4">
+                {/* Situation */}
+                <div className="rounded-lg border border-slate-700/80 bg-background p-4">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                    Situation
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-slate-100">
+                    {scenario.candidatePrompt}
+                  </p>
+                </div>
+
+                {/* Tasks */}
+                {scenario.todos && scenario.todos.length > 0 && (
+                  <div className="rounded-lg border border-slate-700/80 bg-background p-4">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Your Tasks
+                    </p>
+                    <ol className="space-y-2.5">
+                      {scenario.todos.map((todo, i) => (
+                        <li key={i} className="flex gap-3 text-sm text-slate-100">
+                          <span className="mt-0.5 shrink-0 font-mono text-xs font-semibold text-accent">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <span className="leading-6">{todo}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {/* Scope */}
+                {(scenario.scope?.focus?.length || scenario.scope?.skip?.length) ? (
+                  <div className="rounded-lg border border-slate-700/80 bg-background p-4">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Scope
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {scenario.scope?.focus && scenario.scope.focus.length > 0 && (
+                        <div>
+                          <p className="mb-1.5 text-xs font-medium text-slate-400">Focus on</p>
+                          <ul className="space-y-1.5">
+                            {scenario.scope.focus.map((f) => (
+                              <li key={f} className="flex items-start gap-2 text-xs text-slate-300">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent" />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {scenario.scope?.skip && scenario.scope.skip.length > 0 && (
+                        <div>
+                          <p className="mb-1.5 text-xs font-medium text-slate-500">Skip</p>
+                          <ul className="space-y-1.5">
+                            {scenario.scope.skip.map((s) => (
+                              <li key={s} className="flex items-start gap-2 text-xs text-slate-500">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-600" />
+                                {s}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="rounded-lg border border-slate-800 bg-background/70 p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">

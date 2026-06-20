@@ -237,20 +237,6 @@ export default function PipelineApp({
     }
   }
 
-  function formatCandidatePrompt(s: Scenario): string {
-    const parts: string[] = [s.brief.trim()];
-    if (s.todos?.length) {
-      parts.push("\nYour Tasks:");
-      s.todos.forEach((t, i) => parts.push(`${i + 1}. ${t}`));
-    }
-    if (s.scope?.focus?.length || s.scope?.skip?.length) {
-      parts.push("");
-      if (s.scope.focus?.length) parts.push(`Focus on: ${s.scope.focus.join(", ")}`);
-      if (s.scope.skip?.length) parts.push(`Skip: ${s.scope.skip.join(", ")}`);
-    }
-    return parts.join("\n");
-  }
-
   async function shareScenario() {
     if (!scenario || sharing) return;
     setSharing(true);
@@ -265,7 +251,9 @@ export default function PipelineApp({
           {
             id: scenario.id,
             jobTitle: activeJobTitle || undefined,
-            candidatePrompt: formatCandidatePrompt(scenario),
+            candidatePrompt: scenario.brief,
+            todos: scenario.todos ?? [],
+            scope: scenario.scope ?? { focus: [], skip: [] },
             focusAreas: scenario.focusAreas,
             sourceTitle: scenario.groundedOn?.title,
             sourceUrl: scenario.groundedOn?.source,
