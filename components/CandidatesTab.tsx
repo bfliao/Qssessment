@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -81,14 +81,18 @@ function downloadMd(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-function storeAssessmentPackage(
+function buildAssessmentUrl(origin: string, uuid: string) {
+  return `${origin}/assessment?assessment=${uuid}`;
+}
+
+function createAssessmentPackage(
   uuid: string,
   candidate: Candidate,
   app: CandidateApplication,
   markdown: string,
   scenarios: SavedScenario[]
 ) {
-  const payload = {
+  return {
     id: uuid,
     candidateName: candidate.name,
     candidateEmail: candidate.email,
@@ -98,7 +102,24 @@ function storeAssessmentPackage(
     scenarios,
     createdAt: new Date().toISOString(),
   };
-  localStorage.setItem(`question_arena_assessment:${uuid}`, JSON.stringify(payload));
+}
+
+async function storeAssessmentPackage(
+  payload: ReturnType<typeof createAssessmentPackage>
+) {
+  localStorage.setItem(
+    `question_arena_assessment:${payload.id}`,
+    JSON.stringify(payload)
+  );
+  const res = await fetch("/api/assessments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 }
 
 function generateUUID(): string {
@@ -132,7 +153,7 @@ export default function CandidatesTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-400">
-          Manage candidates and send scenario assessments.
+          Manage candidates and generate assessment links.
         </p>
         <button onClick={() => { setEditing(null); setShowForm(true); }} className="btn-primary">
           <Plus className="h-4 w-4" /> Add candidate
@@ -377,14 +398,20 @@ function CandidateRow({
                     key={idx}
                     app={app}
                     savedScenarios={savedScenarios}
-                    onSend={(scenarios) => {
+                    onSend={async (scenarios) => {
                       const uuid = generateUUID();
                       const md = renderAssessmentMd(uuid, candidate, app, scenarios);
-                      storeAssessmentPackage(uuid, candidate, app, md, scenarios);
-                      downloadMd(`${uuid}_${candidate.id}.md`, md);
+                      const payload = createAssessmentPackage(
+                        uuid,
+                        candidate,
+                        app,
+                        md,
+                        scenarios
+                      );
+                      await storeAssessmentPackage(payload);
                       recordSent(app, uuid);
                       setSendModal(null);
-                      return `${window.location.origin}/assessment?assessment=${uuid}`;
+                      return buildAssessmentUrl(window.location.origin, uuid);
                     }}
                     onRemove={() => removeApplication(idx)}
                     sendModal={sendModal}
@@ -412,13 +439,18 @@ function ApplicationRow({
 }: {
   app: CandidateApplication;
   savedScenarios: SavedScenario[];
-  onSend: (scenarios: SavedScenario[]) => string | undefined;
+  onSend: (scenarios: SavedScenario[]) => Promise<string | undefined>;
   onRemove: () => void;
   sendModal: CandidateApplication | null;
   setSendModal: (a: CandidateApplication | null) => void;
 }) {
   const isOpen = sendModal === app;
   const [lastAssessmentUrl, setLastAssessmentUrl] = useState("");
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   // Scenarios for this job
   const relevantScenarios = savedScenarios.filter(
@@ -442,7 +474,7 @@ function ApplicationRow({
             onClick={() => setSendModal(isOpen ? null : app)}
             className="btn-primary text-xs py-1 px-3"
           >
-            <Send className="h-3 w-3" /> Send assessment
+            <Send className="h-3 w-3" /> Generate assessment link
           </button>
           <button onClick={onRemove} className="text-slate-600 hover:text-red-400">
             <Trash2 className="h-3.5 w-3.5" />
@@ -456,8 +488,8 @@ function ApplicationRow({
           jobTitle={app.jobTitle}
           scenarios={relevantScenarios}
           allScenarios={savedScenarios}
-          onSend={(scenarios) => {
-            const url = onSend(scenarios);
+          onSend={async (scenarios) => {
+            const url = await onSend(scenarios);
             if (url) setLastAssessmentUrl(url);
             return url;
           }}
@@ -465,11 +497,28 @@ function ApplicationRow({
         />
       )}
 
-      {/* Sent UUIDs */}
+      {/* Generated assessment links */}
       {app.assessmentsSent.length > 0 && (
-        <div className="space-y-0.5">
+        <div className="space-y-1.5">
           {app.assessmentsSent.map((uuid) => (
-            <p key={uuid} className="font-mono text-xs text-slate-600">{uuid}</p>
+            <div key={uuid} className="flex items-center gap-2">
+              <input
+                readOnly
+                value={origin ? buildAssessmentUrl(origin, uuid) : uuid}
+                className="input h-8 flex-1 font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (origin) {
+                    navigator.clipboard.writeText(buildAssessmentUrl(origin, uuid));
+                  }
+                }}
+                className="btn-ghost h-8 shrink-0 px-2 text-xs"
+              >
+                Copy
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -477,7 +526,7 @@ function ApplicationRow({
       {lastAssessmentUrl && (
         <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 p-2">
           <p className="mb-1 text-xs font-semibold text-emerald-200">
-            Candidate URL
+            Assessment generated. Please send this link to the candidate.
           </p>
           <div className="flex gap-2">
             <input
@@ -511,10 +560,12 @@ function SendAssessmentPanel({
   jobTitle: string;
   scenarios: SavedScenario[];
   allScenarios: SavedScenario[];
-  onSend: (scenarios: SavedScenario[]) => string | undefined;
+  onSend: (scenarios: SavedScenario[]) => Promise<string | undefined>;
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(scenarios.map((s) => s.scenario.id)));
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -564,17 +615,34 @@ function SendAssessmentPanel({
       )}
 
       <div className="flex items-center justify-between pt-1">
-        <span className="text-xs text-slate-500">{chosenScenarios.length} selected → 1 .md file</span>
+        <span className="text-xs text-slate-500">
+          {chosenScenarios.length} selected → 1 candidate link
+        </span>
         <button
-          onClick={() => {
-            if (chosenScenarios.length > 0) onSend(chosenScenarios);
+          onClick={async () => {
+            if (chosenScenarios.length === 0 || generating) return;
+            setGenerating(true);
+            setError("");
+            try {
+              await onSend(chosenScenarios);
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : "Could not generate assessment link."
+              );
+            } finally {
+              setGenerating(false);
+            }
           }}
-          disabled={chosenScenarios.length === 0}
+          disabled={chosenScenarios.length === 0 || generating}
           className="btn-primary text-xs py-1.5 px-4"
         >
-          <Send className="h-3.5 w-3.5" /> Download assessment
+          <Send className="h-3.5 w-3.5" />
+          {generating ? "Generating..." : "Generate link"}
         </button>
       </div>
+      {error && <p className="text-xs text-red-300">{error}</p>}
     </div>
   );
 }

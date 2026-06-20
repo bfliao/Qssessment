@@ -6,12 +6,12 @@ The demo path is:
 
 1. Generate or save a scenario from the dashboard.
 2. Add/select a candidate.
-3. Click `Send assessment`.
-4. The app downloads the assessment markdown, stores the same assessment package in localStorage, and shows a candidate URL.
+3. Click `Generate assessment link`.
+4. The app stores the assessment package in the demo assessment store and shows a candidate URL.
 5. Open the candidate URL: `/assessment?assessment=<uuid>`.
-6. The candidate view loads in dev mode off, compiles the scenario package into a Question Arena config, and starts the Q&A flow.
+6. The candidate view parses the UUID from the link, auto-loads the matching assessment package, compiles it into a Question Arena config, and starts the Q&A flow with dev mode off.
 
-This is intentionally localStorage-backed for the hackathon demo. In production, the UUID would resolve from a database.
+This is intentionally backed by an in-memory server store plus localStorage for the hackathon demo. In production, the UUID would resolve from a database.
 
 Question Arena is an internal testing portal for building ambiguity-based candidate assessments. The current MVP lets the team process a raw teammate storyline into a structured scenario config, edit the interview answer prompt, run a 5-question Q&A with a simulated HR/team/manager source, ask the candidate for a next immediate step, and inspect what hidden context the candidate earned.
 
@@ -52,8 +52,9 @@ Current expected values:
 
 ```bash
 OPENAI_API_KEY=dummy
-OPENAI_BASE_URL=https://c5b6-136-24-140-216.ngrok-free.app/v1
+OPENAI_BASE_URL=https://8819-136-24-140-142.ngrok-free.app/v1
 OPENAI_MODEL=qwen2.5-32b
+VOICE_BASE_URL=http://localhost:8888
 ```
 
 The current hackathon model endpoint is an OpenAI-compatible chat-completions endpoint. It does not fetch online by itself. If a scenario needs web context, add that context to the raw storyline first or build a server-side retrieval step that appends fetched evidence before calling the scenario processor.

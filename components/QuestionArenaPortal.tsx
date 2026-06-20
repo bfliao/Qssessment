@@ -235,38 +235,66 @@ This is for an NG SWE work-sample assessment. The scenario should test whether t
 
   useEffect(() => {
     if (!assessmentId || loadedAssessmentRef.current === assessmentId) return;
+    const id = assessmentId;
     loadedAssessmentRef.current = assessmentId;
 
-    try {
-      const raw = localStorage.getItem(`question_arena_assessment:${assessmentId}`);
-      if (!raw) {
-        setStatus(`Assessment ${assessmentId} was not found in localStorage.`);
-        return;
+    let canceled = false;
+
+    async function loadAssessment() {
+      try {
+        const storageKey = `question_arena_assessment:${id}`;
+        const raw = localStorage.getItem(storageKey);
+        let stored = raw ? (JSON.parse(raw) as StoredAssessmentPackage) : null;
+
+        if (!stored) {
+          const res = await fetch(
+            `/api/assessments?id=${encodeURIComponent(id)}`
+          );
+          if (!res.ok) {
+            setStatus(
+              `Assessment ${id} was not found. Generate the link from the Candidates tab first.`
+            );
+            return;
+          }
+
+          const data = (await res.json()) as {
+            assessment: StoredAssessmentPackage;
+          };
+          stored = data.assessment;
+          localStorage.setItem(storageKey, JSON.stringify(stored));
+        }
+
+        if (canceled) return;
+
+        const markdown = stored.markdown || "";
+        const role = stored.targetRole || stored.jobTitle || targetRole;
+
+        setRawStoryline(markdown);
+        setTargetRole(role);
+        setDevMode(false);
+        setStatus(
+          `Loaded assessment ${id}${
+            stored.candidateName ? ` for ${stored.candidateName}` : ""
+          }.`
+        );
+
+        if (autoProcessAssessment && markdown.trim()) {
+          void processStorylineInput(markdown.trim(), role);
+        }
+      } catch (error) {
+        setStatus(
+          error instanceof Error
+            ? `Could not load assessment package: ${error.message}`
+            : "Could not load assessment package."
+        );
       }
-
-      const stored = JSON.parse(raw) as StoredAssessmentPackage;
-      const markdown = stored.markdown || "";
-      const role = stored.targetRole || stored.jobTitle || targetRole;
-
-      setRawStoryline(markdown);
-      setTargetRole(role);
-      setDevMode(false);
-      setStatus(
-        `Loaded assessment ${assessmentId}${
-          stored.candidateName ? ` for ${stored.candidateName}` : ""
-        }.`
-      );
-
-      if (autoProcessAssessment && markdown.trim()) {
-        void processStorylineInput(markdown.trim(), role);
-      }
-    } catch (error) {
-      setStatus(
-        error instanceof Error
-          ? `Could not load assessment package: ${error.message}`
-          : "Could not load assessment package."
-      );
     }
+
+    void loadAssessment();
+
+    return () => {
+      canceled = true;
+    };
   }, [assessmentId, autoProcessAssessment, targetRole]);
 
   async function askManager(event: React.FormEvent<HTMLFormElement>) {
