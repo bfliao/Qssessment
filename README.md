@@ -1,6 +1,4 @@
-# Question Arena Demo Pipeline
-
-**Qssessment: assessment by questions, not just answers.**
+# Qssessment: assessment by questions, not just answers.
 
 Qssessment turns job requirements into interactive AI interview simulations that
 evaluate how candidates ask questions, uncover context, and reason through
